@@ -74,22 +74,20 @@ typedef struct {
                                                a real press or a genuinely severed wire persists and still latches. */
 
 /* ---------------------------------------------------------------------
- * Engine-caught detection (receiver-only, STARTING -> RUNNING).
- * RPM comes from a plug-lead inductive tach pickup (one pulse per spark;
- * single-cylinder 2-stroke fires once per revolution). Placeholders below
- * are for a Vittorazi Moster 185 (idle ~1600-2500 RPM, cranks at a few
- * hundred) - TUNE ON THE BENCH before flight, like the watchdog constants.
+ * Electric start (receiver-only). MANUAL crank: the starter is energized
+ * while the pilot holds the (hold-confirmed) start button and released when
+ * they let go - the pilot is the "engine caught" sensor, so there is NO tach
+ * in the controller (see ADR 0007). These values bound the crank so it can
+ * never run away. Compile-time constants, tuned on the bench like the watchdog
+ * thresholds - not runtime-adjustable.
  * ------------------------------------------------------------------- */
 
-#define RPM_CAUGHT_THRESHOLD        1200    /* RPM above which the engine is considered self-running.
-                                               Set ABOVE max cranking speed and BELOW the lowest idle
-                                               (1600) so cranking never trips it and a low idle never misses. */
-#define RPM_CAUGHT_STABLE_MS        250     /* RPM must stay >= threshold this long before STARTING -> RUNNING,
-                                               so a single noisy tach pulse can't fake "caught". */
-#define CRANK_TIMEOUT_MS            3000    /* max time to hold the starter engaged waiting for a catch; if the
-                                               engine hasn't caught by then, stop cranking and return to IDLE_SAFE. */
-#define STARTER_COOLDOWN_MS         3000    /* after a crank ends (caught or timed out), refuse a new start request
-                                               this long - protects the starter motor/solenoid from rapid re-cranking. */
-#define RPM_STALE_MS                250     /* if no tach pulse for this long, treat RPM as 0 (sparks stopped). */
+#define MAX_CRANK_MS               2000    /* hard backstop: a single crank can never exceed this, even if the start
+                                               button is held or a fault leaves START_REQ stuck asserted. */
+#define CRANK_LOSS_ABORT_MS        175     /* stop cranking if no valid packet arrives for this long - a faster,
+                                               dedicated loss-of-signal abort than the MAX_CRANK_MS backstop. */
+#define STARTER_COOLDOWN_MS        3000    /* after a crank is FORCE-stopped (backstop or loss), refuse a new crank
+                                               this long. A normal button release imposes no cooldown, so re-cranking
+                                               a stubborn cold engine is instant. */
 
 #endif /* THROTTLE_PROTOCOL_H */

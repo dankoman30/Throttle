@@ -8,13 +8,13 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
 
 ## Safety-critical / blocks flight-readiness
 
-- [~] **Engine-caught detection (`STARTING` → `RUNNING`).** Approach chosen:
-  **real RPM** from the plug-lead inductive tach pickup (Moster 185). Plan:
-  after `fire_starter`, watch RPM; if it climbs past a "caught" threshold and
-  holds for N ms → `RUNNING`; if not within a timeout → stop cranking (bounded
-  starter pulse). Still to do: tach-conditioning circuit (see hardware), pick
-  thresholds/timeout, implement in `receiver_firmware.c`, don't over-trust a
-  single noisy reading. Until implemented, the project is **not flight-ready**.
+- [x] **Engine start / "caught" detection — resolved: MANUAL crank** (ADR 0007).
+  Pilot holds the start button to crank and releases when the engine catches
+  (they hear it + have a separate RPM gauge); no tach in the controller, no
+  RPM-based `STARTING → RUNNING`. Crank is bounded by a loss-of-signal abort and
+  a max-crank cap. This removed the tach subsystem and two non-fail-safe guards.
+  (The project is still **not flight-ready** for other reasons — HAL bring-up,
+  servo selection, hardware — see below.)
 - [ ] **Bench-verify fail-safe kill.** Confirm on real hardware that a
   disconnected/broken kill wire reads as KILL (normally-closed + pull-up, open =
   HIGH = kill). Verify latch + `KILL_DEBOUNCE_MS` rejects vibration glitches but
@@ -28,22 +28,15 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   state machine; decide whether smoke must be force-gated in firmware.
 - [ ] **Confirm mechanical kill wiring** is independent of the MCU and grounds
   the ignition line with zero power to electronics (backup for a dead radio).
-- [ ] **`RUNNING` → `IDLE_SAFE` restart-after-engine-out policy (deferred).**
-  Today, once `RUNNING` the receiver stays there until kill/re-arm; it won't
-  auto-return to `IDLE_SAFE` if the engine dies, so an in-air restart isn't
-  possible without a re-arm. Auto-reverting on RPM=0 is tempting but risky: EMI
-  or a tach fault could falsely zero RPM and then *permit cranking a running
-  engine*. Needs its own careful design (plausibility checks, sustained-zero
-  confirmation, interaction with the START guard below). Linked to tach integrity.
-- [ ] **RPM-based START guard is not fail-safe.** `begin_crank` is gated on
-  `g_current_rpm == 0` to avoid cranking a turning engine — but RPM decays to 0
-  on tach loss (250 ms) and reads 0 after an MCU reset until the first spark, so
-  a **failed/open tach or a just-reset MCU would permit a crank into a running
-  engine**. It's net-positive vs no guard (blocks the case when the tach is
-  healthy) but must not be treated as hardened. Harden via: robust tach
-  conditioning (below), a plausibility/sustained-history check, and ultimately
-  pilot awareness + the mechanical reality. Tracks with the tach-conditioning and
-  ignition-EMI items.
+- [x] ~~`RUNNING` → `IDLE_SAFE` restart policy~~ / ~~RPM START guard not fail-safe~~ —
+  both **moot** under manual crank (ADR 0007): `STATE_RUNNING` no longer exists
+  and the tach-dependent `rpm == 0` START guard is gone. The pilot can always
+  re-crank (rising-edge + cooldown); protection against cranking an already-running
+  engine now relies on pilot awareness + the starter's one-way clutch.
+- [ ] **Tune crank bounds** on the bench: `MAX_CRANK_MS` (2000), `CRANK_LOSS_ABORT_MS`
+  (175), `STARTER_COOLDOWN_MS` (3000). Confirm 2 s is enough for a cold Moster
+  start — the pilot can release + re-press to keep cranking (only forced stops
+  impose a cooldown). See ADR 0007.
 - [ ] **Engine ignition EMI characterization (high priority).** With the receiver
   mounted in its real location next to the engine, sweep the full RPM range and
   log **consecutive** packet losses (not just loss rate) vs RPM. This is the
@@ -91,9 +84,9 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
 - [ ] **Starter driver** — relay/opto to the engine-battery starter *solenoid*
   coil (flyback diode across coil); bounded pulse + cooldown in firmware. Need
   solenoid coil voltage/current.
-- [ ] **Tach-conditioning circuit** — clamp/TVS + series R + squaring stage to
-  turn the plug-lead pickup's spiky pulses into a clean 3.3 V logic edge for a
-  timer input-capture pin. Feeds engine-caught detection above.
+- [x] ~~Tach-conditioning circuit~~ — **dropped**: no tach in the controller
+  (manual crank, ADR 0007). Revisit only if a governor / rev-limiter / auto-idle
+  feature is added later.
 - [ ] **Connectors** — locking, vibration-rated (JST-SM minimum;
   Deutsch/Amphenol preferred).
 - [ ] **Battery readout wiring** — 3/4-LED bar + piezo buzzer per side.

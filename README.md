@@ -16,7 +16,7 @@ engine back to idle if the link drops.
 
 - **Fail-safe wireless kill** — latched on the handle so a brief press survives dropped packets; wired normally-closed so a broken wire = kill, with debounce against vibration glitches.
 - **Loss-of-signal watchdog** — independent of the packet path; ramps the throttle to idle then holds it if the radio link drops, and won't hand control back until the link is stably restored.
-- **RPM-based engine-caught detection** — real tach from a plug-lead pickup confirms the engine actually started (`STARTING → RUNNING`) instead of guessing; supervised, bounded cranking with a cooldown.
+- **Hold-to-crank electric start** — the starter runs while you hold the button and releases when the engine catches; bounded by a fast loss-of-signal abort and a hard max-crank cap so it can never run away.
 - **Cruise control** — hold throttle hands-free; disengages on a second press, kill, or an upward trigger override. Resolved on the handle so the watchdog still overrides it.
 - **Accessory outputs** — switch lights, smoke, etc., kept deliberately outside the safety-critical state machine.
 - **Local battery monitors** — a 3–4 LED bar + low-battery buzzer on *each* unit, no return telemetry.

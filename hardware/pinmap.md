@@ -56,26 +56,25 @@ GPIO** → fits the Nucleo-32 comfortably.
 |---|---|---|---|
 | Servo signal | TIM2_CH1 (PWM) | PA0 | 50 Hz servo PWM; map 0–255 → pulse width |
 | Battery sense | ADC1_INx | PA4 | Receiver's **dedicated** pack |
-| Tach input (RPM) | TIM_CHx input capture | PA1 | From plug-lead inductive pickup — **needs a conditioning circuit** (clamp/TVS + series R + squaring to a clean 3.3 V logic edge) before this pin. One pulse per spark |
 | Kill driver | GPIO out | PB8 | Drives **relay/opto** that grounds the CDI kill wire (parallels mechanical kill). Energize-to-kill |
 | Starter driver | GPIO out | PB9 | Drives **relay/opto** to the engine-battery starter solenoid coil (flyback diode across coil). Bounded pulse + cooldown in firmware |
 | Aux1 out (lights) | GPIO out | PB10 | Via driver sized to the load |
 | Aux2 out (smoke)  | GPIO out | PB11 | Via driver sized to the load |
 
-Receiver pin tally ≈ 5–6 (radio) + 6 (battery) + 7 (servo/tach/kill/starter/aux)
-= **~18–19 GPIO** → also fits the Nucleo-32.
+Receiver pin tally ≈ 5–6 (radio) + 6 (battery) + 6 (servo/kill/starter/aux)
+= **~17–18 GPIO** → also fits the Nucleo-32. (No tach input — start is manual;
+see ADR 0007.)
 
 ## Conclusion
 
 **Nucleo-32 STM32L432KC is sufficient for both units.** No need to step up to a
 Nucleo-64 on pin count. Bring-up order suggestion: radio link first (prove
 handle→receiver packets), then servo, then battery monitor, then the engine
-interface (kill/starter/tach) last — that one wants isolation hardware and the
+interface (kill/starter) last — that one wants isolation hardware and the
 engine present.
 
 ### Engine-interface hardware still to spec (see docs/OPEN-ITEMS.md)
 - Isolation device choice for kill + starter (relay vs opto-SSR).
 - CDI kill-wire voltage/behavior on the actual Moster 185.
 - Starter solenoid coil voltage/current (sizes the driver + flyback).
-- Tach-conditioning circuit component values.
 - Servo selection (from cable-force measurement) → receiver power budget / BEC.
