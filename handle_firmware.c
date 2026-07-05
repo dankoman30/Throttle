@@ -28,6 +28,16 @@ static bool      g_start_button_pressed_last = false;
 static uint32_t  g_start_hold_start_ms = 0;
 static bool      g_start_hold_confirmed = false;
 
+/* Kill is LATCHED on the handle: once the kill switch is seen active even
+ * once, we keep commanding kill on every packet from then on. A brief press
+ * therefore produces a sustained stream of kill packets rather than a few,
+ * so a run of dropped packets (no radio ack in this design) can't swallow it.
+ * This mirrors the receiver's sticky STATE_KILLED. Clearing it requires a
+ * deliberate re-arm - a power cycle here, which matches the "physical re-arm
+ * only" rule in PROJECT_DESIGN.md. The mechanical kill line is the backup for
+ * when the radio itself is dead. */
+static bool      g_kill_latched = false;
+
 /* Replace with your actual millisecond tick source (e.g. HAL_GetTick()) */
 static uint32_t millis(void) {
     // return HAL_GetTick();
@@ -97,9 +107,13 @@ static void build_and_send_packet(void) {
 
     pkt.flags = 0;
     if (read_kill_switch()) {
-        pkt.flags |= CMD_FLAG_KILL;
+        g_kill_latched = true;   /* sticky: never un-latches without a re-arm */
     }
-    if (start_request_confirmed()) {
+    if (g_kill_latched) {
+        pkt.flags |= CMD_FLAG_KILL;
+        /* Once killed, suppress any start request so a latched kill and a
+         * start can never be commanded in the same packet. */
+    } else if (start_request_confirmed()) {
         pkt.flags |= CMD_FLAG_START_REQ;
     }
 

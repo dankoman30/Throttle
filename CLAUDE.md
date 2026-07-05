@@ -22,7 +22,7 @@ gcc -DTEST -I. your_test.c && ./a.out    # no test harness exists yet; write one
 
 Two independent MCUs share one contract: **`throttle_protocol.h`** (packet layout + every timing constant) and **`crc8.h`**. Both files must stay byte-identical on both ends — changing the packet struct or a `#define` affects handle and receiver together. All timing/threshold values are deliberately **compile-time constants**, tuned on the bench, never runtime-adjustable.
 
-- `handle_firmware.c` — transmitter. Reads inputs, debounces, enforces hold-to-start (`START_HOLD_REQUIRED_MS`), builds `throttle_packet_t`, sends at `HANDLE_TX_RATE_HZ`. Send-only radio (`stopListening`).
+- `handle_firmware.c` — transmitter. Reads inputs, debounces, enforces hold-to-start (`START_HOLD_REQUIRED_MS`), builds `throttle_packet_t`, sends at `HANDLE_TX_RATE_HZ`. Send-only radio (`stopListening`). **Kill is latched here** (`g_kill_latched`): once the switch is seen active, every subsequent packet carries `CMD_FLAG_KILL` so a brief press survives dropped packets in this ack-less link; it also suppresses start-request in the same packet. Clearing it requires a re-arm (power cycle). The mechanical kill line is the backup for a dead radio.
 - `receiver_firmware.c` — receiver + servo driver + state machine + loss-of-signal watchdog.
 
 **Safety ordering is the core design and must be preserved when editing the receiver:**
