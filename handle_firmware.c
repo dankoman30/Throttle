@@ -39,6 +39,10 @@ static bool      g_start_hold_confirmed = false;
  * when the radio itself is dead. */
 static bool      g_kill_latched = false;
 
+/* Debounce state for the fail-safe kill line (see kill_confirmed). */
+static bool      g_kill_active_last = false;
+static uint32_t  g_kill_active_since_ms = 0;
+
 /* Cruise control state (handle-side; see apply_cruise). */
 static bool      g_cruise_engaged = false;
 static uint8_t   g_cruise_setpoint = 0;
@@ -62,7 +66,13 @@ static uint32_t millis(void) {
 
 /* Read raw ADC and map to 0-255 throttle scale.
  * Apply a light low-pass filter here so noisy ADC readings don't
- * translate into a jittery servo on the receiving end. */
+ * translate into a jittery servo on the receiving end.
+ *
+ * FAIL-SAFE WIRING: put a pull-down on the ADC input (and reference the
+ * trigger pot so its wiper idles toward 0), so a broken/disconnected trigger
+ * reads ~0 = idle, never a spurious high throttle. This is the analog
+ * equivalent of the fail-safe switch polarity: the failure state is the
+ * safe state. */
 static uint8_t read_throttle_position(void) {
     // uint32_t raw = HAL_ADC_GetValue(&hadc1); // e.g. 0-4095 for 12-bit ADC
     uint32_t raw = 0; /* placeholder */
@@ -78,9 +88,31 @@ static uint8_t read_throttle_position(void) {
     return mapped;
 }
 
+/* Returns true when kill is being REQUESTED. Wired FAIL-SAFE: the kill switch
+ * is normally-closed with a pull-up, so during normal operation the pin is
+ * held LOW ("armed/ok"); pressing kill OPENS the switch and, crucially, so
+ * does a broken wire or a vibrated-loose connector - both let the pull-up
+ * pull the pin HIGH = kill. The failure state is the safe state.
+ * (This is the reverse polarity from start/cruise/aux, and that is on purpose:
+ *  a missed kill is dangerous, a spurious kill is merely a safe engine-off.) */
 static bool read_kill_switch(void) {
-    // return HAL_GPIO_ReadPin(KILL_SW_GPIO_Port, KILL_SW_Pin) == GPIO_PIN_SET;
-    return false; /* placeholder */
+    // return HAL_GPIO_ReadPin(KILL_SW_GPIO_Port, KILL_SW_Pin) == GPIO_PIN_SET; /* open/broken = HIGH = kill */
+    return false; /* placeholder: "not requesting kill" so the stub stays runnable */
+}
+
+/* Debounced kill: the line must read "kill" continuously for KILL_DEBOUNCE_MS
+ * before we treat it as a real kill. This rejects brief vibration glitches on
+ * the normally-closed line without weakening fail-safe - a genuine press or a
+ * truly severed wire stays open and easily outlasts the window. Latching
+ * itself (g_kill_latched) is handled by the caller and is permanent until
+ * re-arm; this only gates the moment of latching. */
+static bool kill_confirmed(void) {
+    bool active = read_kill_switch();
+    if (active && !g_kill_active_last) {
+        g_kill_active_since_ms = millis();   /* transition into "kill requested" */
+    }
+    g_kill_active_last = active;
+    return active && (millis() - g_kill_active_since_ms) >= KILL_DEBOUNCE_MS;
 }
 
 static bool read_start_button_raw(void) {
@@ -89,23 +121,24 @@ static bool read_start_button_raw(void) {
 }
 
 /* --- Cruise + accessory inputs ---
- * Each of these returns the LOGICAL "active/requested" state, hiding the
- * electrical polarity. Momentary buttons here are wired open=off / closed=on
- * (per the start/kill switches); the accessory rocker/momentary switches use
- * open=on / closed=off, so read_aux* inverts. Put the ONLY polarity decision
- * for each input right here so re-wiring is a one-line change. */
-static bool read_cruise_button_raw(void) {
+ * Each returns the LOGICAL "active/requested" state, hiding electrical
+ * polarity. Everything here EXCEPT kill is wired the same, intuitive way:
+ * closed = on/active, with a pull-down so an open/broken wire reads off - the
+ * safe state for these is "do nothing" (don't crank, don't engage cruise,
+ * accessory off). Only kill inverts (see read_kill_switch). Keeping the ONE
+ * polarity decision per input right here makes re-wiring a one-line change. */
+static bool read_cruise_button_raw(void) { /* closed = pressed */
     // return HAL_GPIO_ReadPin(CRUISE_BTN_GPIO_Port, CRUISE_BTN_Pin) == GPIO_PIN_SET;
     return false; /* placeholder */
 }
 
-static bool read_aux1_switch(void) { /* e.g. lights: open=on -> invert */
-    // return HAL_GPIO_ReadPin(AUX1_GPIO_Port, AUX1_Pin) == GPIO_PIN_RESET;
+static bool read_aux1_switch(void) { /* e.g. lights: closed = on */
+    // return HAL_GPIO_ReadPin(AUX1_GPIO_Port, AUX1_Pin) == GPIO_PIN_SET;
     return false; /* placeholder */
 }
 
-static bool read_aux2_switch(void) { /* e.g. smoke: open=on -> invert */
-    // return HAL_GPIO_ReadPin(AUX2_GPIO_Port, AUX2_Pin) == GPIO_PIN_RESET;
+static bool read_aux2_switch(void) { /* e.g. smoke: closed = on */
+    // return HAL_GPIO_ReadPin(AUX2_GPIO_Port, AUX2_Pin) == GPIO_PIN_SET;
     return false; /* placeholder */
 }
 
@@ -184,7 +217,7 @@ static void build_and_send_packet(void) {
 
     /* Evaluate kill FIRST so cruise sees it, then let cruise decide what
      * throttle value actually goes on the wire (frozen setpoint vs live). */
-    if (read_kill_switch()) {
+    if (kill_confirmed()) {
         g_kill_latched = true;   /* sticky: never un-latches without a re-arm */
     }
     pkt.throttle = apply_cruise(read_throttle_position());

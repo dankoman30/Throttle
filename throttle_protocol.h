@@ -66,4 +66,9 @@ typedef struct {
 
 #define START_HOLD_REQUIRED_MS      600     /* pilot must hold start button this long before it's sent as valid */
 
+#define KILL_DEBOUNCE_MS            30      /* kill line must read "kill" continuously this long before latching.
+                                               Kill is wired fail-safe (normally-closed, open/broken = kill), so this
+                                               rejects vibration glitches on the line without defeating fail-safe:
+                                               a real press or a genuinely severed wire persists and still latches. */
+
 #endif /* THROTTLE_PROTOCOL_H */
