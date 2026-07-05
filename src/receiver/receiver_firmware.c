@@ -44,6 +44,13 @@ static bool      g_recovering_from_loss = false;
 static uint8_t   g_current_servo_throttle = IDLE_THROTTLE_VALUE;
 static uint8_t   g_target_throttle = IDLE_THROTTLE_VALUE;
 
+/* Engine-caught detection state (STARTING -> RUNNING via tach RPM). */
+static uint32_t  g_last_tach_ms = 0;          /* time of the most recent tach pulse */
+static uint16_t  g_current_rpm = 0;           /* latest computed RPM (0 if stale) */
+static uint32_t  g_crank_start_ms = 0;        /* when the current crank attempt began */
+static uint32_t  g_rpm_caught_since_ms = 0;   /* when RPM first crossed the caught threshold (0 = not yet) */
+static uint32_t  g_starter_cooldown_until_ms = 0; /* refuse new starts until this time */
+
 /* Local battery monitor state (receiver pack only - no telemetry to handle). */
 static uint32_t  g_batt_last_poll_ms = 0;
 static bool      g_batt_low = false;
@@ -71,9 +78,42 @@ static void cut_ignition(void) {
     // HAL_GPIO_WritePin(KILL_RELAY_GPIO_Port, KILL_RELAY_Pin, GPIO_PIN_SET);
 }
 
-static void fire_starter(void) {
-    // HAL_GPIO_WritePin(STARTER_RELAY_GPIO_Port, STARTER_RELAY_Pin, GPIO_PIN_SET);
-    // consider a bounded pulse duration + cooldown here rather than a raw on/off
+/* Drive the starter solenoid via its relay/opto (energize-to-crank). The crank
+ * is bounded and supervised by engine_caught_tick + the main-loop safety net,
+ * never left on. */
+static void set_starter(bool on) {
+    // HAL_GPIO_WritePin(STARTER_RELAY_GPIO_Port, STARTER_RELAY_Pin, on ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    (void)on;
+}
+
+/* Compute RPM from the interval between two tach pulses. A single-cylinder
+ * 2-stroke fires once per revolution, so RPM = 60000 / ms_between_sparks. */
+static uint16_t rpm_from_interval_ms(uint32_t interval_ms) {
+    if (interval_ms == 0) return 0;
+    uint32_t rpm = 60000u / interval_ms;
+    return (rpm > 0xFFFFu) ? 0xFFFFu : (uint16_t)rpm;
+}
+
+/* Called from the tach input-capture ISR (one call per spark). Kept tiny. */
+static void on_tach_edge(void) {
+    uint32_t now = millis();
+    uint32_t interval = now - g_last_tach_ms;
+    g_last_tach_ms = now;
+    g_current_rpm = rpm_from_interval_ms(interval);
+}
+
+/* Begin a supervised crank attempt. Only ever called from the START path. */
+static void begin_crank(void) {
+    g_state = STATE_STARTING;
+    g_crank_start_ms = millis();
+    g_rpm_caught_since_ms = 0;
+    set_starter(true);
+}
+
+/* Stop cranking and record the cooldown so we don't immediately re-crank. */
+static void end_crank(void) {
+    set_starter(false);
+    g_starter_cooldown_until_ms = millis() + STARTER_COOLDOWN_MS;
 }
 
 /* Accessory outputs (lights, smoke, ...). These are NON-safety and are
@@ -156,6 +196,7 @@ static void handle_valid_packet(const throttle_packet_t *pkt) {
     /* --- 1. KILL: highest priority, checked before anything else --- */
     if (pkt->flags & CMD_FLAG_KILL) {
         cut_ignition();
+        set_starter(false);            /* kill also aborts any crank in progress */
         g_state = STATE_KILLED;
         g_target_throttle = IDLE_THROTTLE_VALUE;
         return; /* ignore throttle/start fields in this packet entirely */
@@ -168,28 +209,28 @@ static void handle_valid_packet(const throttle_packet_t *pkt) {
     }
 
     /* --- 2. START: only actionable from IDLE_SAFE, only if throttle at idle,
-     *        and only if link isn't currently in a post-loss recovery window --- */
+     *        only outside a post-loss recovery window, and only after the
+     *        starter cooldown from any previous crank has elapsed --- */
     if ((pkt->flags & CMD_FLAG_START_REQ) &&
         g_state == STATE_IDLE_SAFE &&
         pkt->throttle <= IDLE_THRESHOLD_FOR_START &&
-        !g_recovering_from_loss) {
-        g_state = STATE_STARTING;
-        fire_starter();
-        /* transition to RUNNING should happen once you have some signal the
-         * engine caught (RPM sense, vibration, or just a timed window) -
-         * left as a follow-up depending on what feedback you have available */
+        !g_recovering_from_loss &&
+        g_current_rpm == 0 &&    /* no recent spark seen -> engine believed stopped. Blocks cranking a
+                                    turning engine (incl. a pull-started one) WHEN THE TACH IS HEALTHY.
+                                    NOT fail-safe: a failed/open tach or a just-reset MCU also reads 0 and
+                                    would permit a crank into a running engine. Net-positive vs no guard,
+                                    but not a hardened guarantee - see docs/OPEN-ITEMS.md. */
+        (int32_t)(millis() - g_starter_cooldown_until_ms) >= 0) {
+        begin_crank();  /* -> STATE_STARTING; engine_caught_tick supervises it */
     }
 
-    /* --- 3. THROTTLE: only apply pilot input if we're not mid-recovery --- */
+    /* --- 3. THROTTLE: apply pilot input to the SERVO TARGET only. Throttle
+     *        position must NOT drive state transitions - STARTING -> RUNNING is
+     *        decided solely by verified RPM in engine_caught_tick, so pilot
+     *        throttle can never fake "engine caught", and raising throttle from
+     *        IDLE_SAFE can never promote to RUNNING without an actual start. --- */
     if (!g_recovering_from_loss) {
         g_target_throttle = pkt->throttle;
-        if (g_state == STATE_STARTING || g_state == STATE_IDLE_SAFE) {
-            /* leave as-is; state transitions to RUNNING elsewhere once
-               engine-caught confirmation exists */
-        }
-        if (g_state != STATE_KILLED) {
-            g_state = (g_target_throttle > IDLE_THRESHOLD_FOR_START) ? STATE_RUNNING : g_state;
-        }
     }
 
     g_ramping_to_idle = false; /* fresh valid data cancels any in-progress ramp */
@@ -256,6 +297,46 @@ static void watchdog_tick(void) {
     }
 }
 
+/* Supervises a crank attempt. Runs every control tick, independent of packet
+ * arrival (like watchdog_tick). No-op unless we're STARTING. */
+static void engine_caught_tick(void) {
+    uint32_t now = millis();
+
+    /* RPM reads 0 once sparks stop (engine not turning / not firing). */
+    if ((now - g_last_tach_ms) >= RPM_STALE_MS) {
+        g_current_rpm = 0;
+    }
+
+    if (g_state != STATE_STARTING) return;
+
+    /* Loss of signal during a start aborts the crank - the pilot can't command
+     * kill wirelessly while the link is down, so don't keep cranking blind. */
+    if (g_recovering_from_loss) {
+        end_crank();
+        g_state = STATE_IDLE_SAFE;
+        return;
+    }
+
+    /* Caught: RPM must hold at/above the threshold for RPM_CAUGHT_STABLE_MS so a
+     * single noisy tach pulse can't fake it. */
+    if (g_current_rpm >= RPM_CAUGHT_THRESHOLD) {
+        if (g_rpm_caught_since_ms == 0) g_rpm_caught_since_ms = now;
+        if ((now - g_rpm_caught_since_ms) >= RPM_CAUGHT_STABLE_MS) {
+            end_crank();
+            g_state = STATE_RUNNING;
+            return;
+        }
+    } else {
+        g_rpm_caught_since_ms = 0;   /* dropped back below - restart the hold */
+    }
+
+    /* Didn't catch within the crank window: stop and return to safe idle. */
+    if ((now - g_crank_start_ms) >= CRANK_TIMEOUT_MS) {
+        end_crank();
+        g_state = STATE_IDLE_SAFE;
+    }
+}
+
 int receiver_firmware_main(void) {
     /* --- Init section (fill in) ---
      * HAL_Init(); SystemClock_Config(); MX_GPIO_Init(); MX_TIM_PWM_Init();
@@ -265,6 +346,10 @@ int receiver_firmware_main(void) {
      * radio.setChannel(...);          // must match handle
      * radio.setAutoAck(false);
      * radio.startListening();
+     *
+     * Configure a timer in input-capture mode on the tach pin and call
+     * on_tach_edge() from its capture ISR (one call per spark). Enable the
+     * timer's digital input filter to reject ringing on each ignition pulse.
      */
 
     uint32_t last_tick = millis();
@@ -281,6 +366,13 @@ int receiver_firmware_main(void) {
         if (now != last_tick) { /* run watchdog + servo step roughly once per ms tick, adjust to your loop rate */
             last_tick = now;
             watchdog_tick();
+            engine_caught_tick();
+            /* Safety net: the starter must never be energized unless we are
+             * actively cranking. Belt-and-suspenders against any path that
+             * leaves STATE_STARTING without calling end_crank(). */
+            if (g_state != STATE_STARTING) {
+                set_starter(false);
+            }
             if (!g_ramping_to_idle && g_state != STATE_KILLED) {
                 step_toward_target(g_target_throttle);
             }

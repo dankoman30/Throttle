@@ -73,4 +73,23 @@ typedef struct {
                                                rejects vibration glitches on the line without defeating fail-safe:
                                                a real press or a genuinely severed wire persists and still latches. */
 
+/* ---------------------------------------------------------------------
+ * Engine-caught detection (receiver-only, STARTING -> RUNNING).
+ * RPM comes from a plug-lead inductive tach pickup (one pulse per spark;
+ * single-cylinder 2-stroke fires once per revolution). Placeholders below
+ * are for a Vittorazi Moster 185 (idle ~1600-2500 RPM, cranks at a few
+ * hundred) - TUNE ON THE BENCH before flight, like the watchdog constants.
+ * ------------------------------------------------------------------- */
+
+#define RPM_CAUGHT_THRESHOLD        1200    /* RPM above which the engine is considered self-running.
+                                               Set ABOVE max cranking speed and BELOW the lowest idle
+                                               (1600) so cranking never trips it and a low idle never misses. */
+#define RPM_CAUGHT_STABLE_MS        250     /* RPM must stay >= threshold this long before STARTING -> RUNNING,
+                                               so a single noisy tach pulse can't fake "caught". */
+#define CRANK_TIMEOUT_MS            3000    /* max time to hold the starter engaged waiting for a catch; if the
+                                               engine hasn't caught by then, stop cranking and return to IDLE_SAFE. */
+#define STARTER_COOLDOWN_MS         3000    /* after a crank ends (caught or timed out), refuse a new start request
+                                               this long - protects the starter motor/solenoid from rapid re-cranking. */
+#define RPM_STALE_MS                250     /* if no tach pulse for this long, treat RPM as 0 (sparks stopped). */
+
 #endif /* THROTTLE_PROTOCOL_H */

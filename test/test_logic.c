@@ -61,6 +61,41 @@ static uint8_t cruise_step(cruise_t *c, bool btn, uint8_t live) {
     return c->engaged ? c->setpoint : live;
 }
 
+/* --- mirror of receiver_firmware.c:rpm_from_interval_ms --- */
+static uint16_t rpm_from_interval_ms(uint32_t interval_ms) {
+    if (interval_ms == 0) return 0;
+    uint32_t rpm = 60000u / interval_ms;
+    return (rpm > 0xFFFFu) ? 0xFFFFu : (uint16_t)rpm;
+}
+
+/* --- mirror of receiver_firmware.c:engine_caught_tick (pure form) ---
+ * State passed explicitly; rpm is driven as an input. */
+typedef enum { S_IDLE, S_RUN, S_START } st_t;
+typedef struct {
+    st_t     state;
+    uint16_t rpm;
+    uint32_t crank_start;
+    uint32_t caught_since;
+    bool     recovering;
+    bool     starter_on;
+} ecu_t;
+
+static void ecu_tick(ecu_t *e, uint32_t now) {
+    if (e->state != S_START) return;
+    if (e->recovering) { e->starter_on = false; e->state = S_IDLE; return; }
+    if (e->rpm >= RPM_CAUGHT_THRESHOLD) {
+        if (e->caught_since == 0) e->caught_since = now;
+        if ((now - e->caught_since) >= RPM_CAUGHT_STABLE_MS) {
+            e->starter_on = false; e->state = S_RUN; return;
+        }
+    } else {
+        e->caught_since = 0;
+    }
+    if ((now - e->crank_start) >= CRANK_TIMEOUT_MS) {
+        e->starter_on = false; e->state = S_IDLE;
+    }
+}
+
 int main(void) {
     /* --- CRC8/MAXIM known-answer vector --- */
     CHECK(crc8_compute((const uint8_t *)"123456789", 9) == 0xA1);
@@ -137,6 +172,47 @@ int main(void) {
       CHECK(!kill_confirmed_m(&k, true, 20));                   /* new activation, timer resets */
       CHECK(!kill_confirmed_m(&k, true, 20 + KILL_DEBOUNCE_MS - 1));
       CHECK(kill_confirmed_m(&k, true, 20 + KILL_DEBOUNCE_MS)); /* confirms from the NEW start */
+    }
+
+    /* --- RPM from tach interval (one spark/rev, 2-stroke single) --- */
+    CHECK(rpm_from_interval_ms(30) == 2000);
+    CHECK(rpm_from_interval_ms(40) == 1500);
+    CHECK(rpm_from_interval_ms(10) == 6000);
+    CHECK(rpm_from_interval_ms(0)  == 0);       /* guard against div-by-zero */
+    CHECK(rpm_from_interval_ms(60000) == 1);
+
+    /* --- engine caught: RPM holds above threshold for the stable window --- */
+    { ecu_t e = { .state = S_START, .rpm = 0, .crank_start = 0 };
+      ecu_tick(&e, 100);  CHECK(e.state == S_START);            /* cranking, no catch */
+      e.rpm = RPM_CAUGHT_THRESHOLD + 300;                        /* fires, spins up */
+      ecu_tick(&e, 1000); CHECK(e.state == S_START);            /* hold just started */
+      ecu_tick(&e, 1000 + RPM_CAUGHT_STABLE_MS - 1); CHECK(e.state == S_START);
+      ecu_tick(&e, 1000 + RPM_CAUGHT_STABLE_MS);
+      CHECK(e.state == S_RUN && !e.starter_on);                  /* caught -> RUNNING, starter off */
+    }
+    /* --- crank timeout: never catches -> stop, back to IDLE_SAFE --- */
+    { ecu_t e = { .state = S_START, .rpm = 500 /* cranking, below threshold */, .crank_start = 0 };
+      ecu_tick(&e, CRANK_TIMEOUT_MS - 1); CHECK(e.state == S_START);
+      ecu_tick(&e, CRANK_TIMEOUT_MS);
+      CHECK(e.state == S_IDLE && !e.starter_on);
+    }
+    /* --- a single noisy pulse must NOT fake a catch --- */
+    { ecu_t e = { .state = S_START, .rpm = 0, .crank_start = 0 };
+      e.rpm = RPM_CAUGHT_THRESHOLD + 500;
+      ecu_tick(&e, 500);                          /* caught_since = 500 */
+      e.rpm = 0;                                  /* pulse was noise; RPM collapses */
+      ecu_tick(&e, 500 + RPM_CAUGHT_STABLE_MS + 50);
+      CHECK(e.state == S_START);                  /* hold reset, still cranking */
+      CHECK(e.caught_since == 0);
+    }
+    /* --- loss of signal during a start aborts the crank --- */
+    { ecu_t e = { .state = S_START, .rpm = 0, .crank_start = 0, .starter_on = true, .recovering = true };
+      ecu_tick(&e, 200);
+      CHECK(e.state == S_IDLE && !e.starter_on);
+    }
+    /* --- tick is a no-op when not STARTING --- */
+    { ecu_t e = { .state = S_RUN, .rpm = 0, .crank_start = 0 };
+      ecu_tick(&e, CRANK_TIMEOUT_MS + 5000); CHECK(e.state == S_RUN);
     }
 
     if (g_fail == 0) printf("ALL TESTS PASSED\n");

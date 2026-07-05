@@ -28,6 +28,22 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   state machine; decide whether smoke must be force-gated in firmware.
 - [ ] **Confirm mechanical kill wiring** is independent of the MCU and grounds
   the ignition line with zero power to electronics (backup for a dead radio).
+- [ ] **`RUNNING` → `IDLE_SAFE` restart-after-engine-out policy (deferred).**
+  Today, once `RUNNING` the receiver stays there until kill/re-arm; it won't
+  auto-return to `IDLE_SAFE` if the engine dies, so an in-air restart isn't
+  possible without a re-arm. Auto-reverting on RPM=0 is tempting but risky: EMI
+  or a tach fault could falsely zero RPM and then *permit cranking a running
+  engine*. Needs its own careful design (plausibility checks, sustained-zero
+  confirmation, interaction with the START guard below). Linked to tach integrity.
+- [ ] **RPM-based START guard is not fail-safe.** `begin_crank` is gated on
+  `g_current_rpm == 0` to avoid cranking a turning engine — but RPM decays to 0
+  on tach loss (250 ms) and reads 0 after an MCU reset until the first spark, so
+  a **failed/open tach or a just-reset MCU would permit a crank into a running
+  engine**. It's net-positive vs no guard (blocks the case when the tach is
+  healthy) but must not be treated as hardened. Harden via: robust tach
+  conditioning (below), a plausibility/sustained-history check, and ultimately
+  pilot awareness + the mechanical reality. Tracks with the tach-conditioning and
+  ignition-EMI items.
 - [ ] **Engine ignition EMI characterization (high priority).** With the receiver
   mounted in its real location next to the engine, sweep the full RPM range and
   log **consecutive** packet losses (not just loss rate) vs RPM. This is the

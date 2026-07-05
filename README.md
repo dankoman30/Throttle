@@ -1,5 +1,9 @@
 # Throttle — drive-by-wire paramotor throttle
 
+**A wireless, fail-safe throttle for a paramotor — trigger in your hand, servo on the engine, no cable between them.**
+
+`Status: in development · pre-hardware · not flight-ready` — see [Status](#status--not-flight-ready).
+
 Open firmware (and, in time, hardware) for a **drive-by-wire paramotor throttle**.
 A handle-mounted STM32 reads a trigger, kill switch, start button, cruise button
 and accessory switches, and transmits 5-byte packets at 80 Hz over an nRF24L01+
@@ -7,6 +11,16 @@ radio to a second STM32 near the engine. The receiver validates every packet,
 runs a kill/start/run state machine, and drives a servo that pulls the physical
 throttle cable — with an independent loss-of-signal watchdog that ramps the
 engine back to idle if the link drops.
+
+## Features
+
+- **Fail-safe wireless kill** — latched on the handle so a brief press survives dropped packets; wired normally-closed so a broken wire = kill, with debounce against vibration glitches.
+- **Loss-of-signal watchdog** — independent of the packet path; ramps the throttle to idle then holds it if the radio link drops, and won't hand control back until the link is stably restored.
+- **RPM-based engine-caught detection** — real tach from a plug-lead pickup confirms the engine actually started (`STARTING → RUNNING`) instead of guessing; supervised, bounded cranking with a cooldown.
+- **Cruise control** — hold throttle hands-free; disengages on a second press, kill, or an upward trigger override. Resolved on the handle so the watchdog still overrides it.
+- **Accessory outputs** — switch lights, smoke, etc., kept deliberately outside the safety-critical state machine.
+- **Local battery monitors** — a 3–4 LED bar + low-battery buzzer on *each* unit, no return telemetry.
+- **Layered safety by design** — packet validation (sync → CRC8 → sequence), kill-always-first command ordering, rate-limited servo motion, and a mechanical kill wired straight to the ignition, independent of any firmware.
 
 > [!WARNING]
 > ## Safety disclaimer — read this
