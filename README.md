@@ -1,6 +1,8 @@
 # Throttle — drive-by-wire paramotor throttle
 
-**A wireless, fail-safe throttle for a paramotor — trigger in your hand, servo on the engine, no cable between them.**
+**A wireless, fail-safe paramotor throttle — squeeze the trigger, a radio link drives a servo that works the engine's throttle. No long mechanical cable running from your hand to the motor.**
+
+The servo is **remote-mounted** (on the frame, not bolted to the engine) and pulls the throttle via a short push-pull cable — for space, vibration isolation, and a spring-return-to-idle fail-safe. See [`docs/PROJECT_DESIGN.md`](docs/PROJECT_DESIGN.md).
 
 `Status: in development · pre-hardware · not flight-ready` — see [Status](#status--not-flight-ready).
 
