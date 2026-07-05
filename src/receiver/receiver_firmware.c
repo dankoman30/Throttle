@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Copyright (C) 2026 Daniel Koman */
 /* ---------------------------------------------------------------------
  * receiver_firmware.c
  *
@@ -17,12 +19,14 @@
 #include <stdbool.h>
 #include "throttle_protocol.h"
 #include "crc8.h"
+#include "battery_monitor.h"
 
 typedef enum {
-    STATE_IDLE_SAFE,
-    STATE_RUNNING,
-    STATE_STARTING,
-    STATE_KILLED
+    STATE_IDLE_SAFE,   /* normal armed operation: throttle live, start allowed. Without a tach we
+                          cannot sense whether the engine is actually running, so this one state
+                          covers both "engine off" and "engine running" - the pilot knows which. */
+    STATE_STARTING,    /* starter energized (transient, while the start button is held) */
+    STATE_KILLED       /* sticky; cleared only by physical re-arm */
 } throttle_state_t;
 
 static throttle_state_t g_state = STATE_IDLE_SAFE;
@@ -41,6 +45,22 @@ static bool      g_recovering_from_loss = false;
 static uint8_t   g_current_servo_throttle = IDLE_THROTTLE_VALUE;
 static uint8_t   g_target_throttle = IDLE_THROTTLE_VALUE;
 
+/* Manual-crank state. The pilot holds the start button to crank and releases
+ * when the engine catches (no tach in the controller - see ADR 0007). */
+static uint32_t  g_crank_start_ms = 0;            /* when the current crank began */
+static bool      g_start_req_prev = false;        /* previous packet's START_REQ, for rising-edge detection */
+static uint32_t  g_starter_cooldown_until_ms = 0; /* refuse a new crank until this time (set only on a forced stop) */
+
+/* Local battery monitor state (receiver pack only - no telemetry to handle). */
+static uint32_t  g_batt_last_poll_ms = 0;
+static bool      g_batt_low = false;
+
+/* Receiver pack profile. Example: 2S LiFePO4 near the engine; measure real
+ * full/empty/low points and the divider before trusting these numbers. */
+static const battery_profile_t RX_BATT = {
+    .full_mv = 7200, .empty_mv = 5000, .low_mv = 5600, .led_count = 4
+};
+
 static uint32_t millis(void) {
     // return HAL_GetTick();
     return 0; /* placeholder */
@@ -58,9 +78,71 @@ static void cut_ignition(void) {
     // HAL_GPIO_WritePin(KILL_RELAY_GPIO_Port, KILL_RELAY_Pin, GPIO_PIN_SET);
 }
 
-static void fire_starter(void) {
-    // HAL_GPIO_WritePin(STARTER_RELAY_GPIO_Port, STARTER_RELAY_Pin, GPIO_PIN_SET);
-    // consider a bounded pulse duration + cooldown here rather than a raw on/off
+/* Drive the starter solenoid via its relay/opto (energize-to-crank). The crank
+ * is bounded by crank_tick + the main-loop safety net, never left on. */
+static void set_starter(bool on) {
+    // HAL_GPIO_WritePin(STARTER_RELAY_GPIO_Port, STARTER_RELAY_Pin, on ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    (void)on;
+}
+
+/* Begin a crank. Only ever called from the gated rising-edge START path. */
+static void begin_crank(void) {
+    g_state = STATE_STARTING;
+    g_crank_start_ms = millis();
+    set_starter(true);
+}
+
+/* Stop cranking and return to the normal armed state. 'forced' means the crank
+ * was cut by a safety limit (max-crank backstop or loss of signal) rather than
+ * a voluntary button release; only a forced stop imposes the cooldown, so
+ * re-cranking a stubborn engine after a normal release is instant. */
+static void end_crank(bool forced) {
+    set_starter(false);
+    if (forced) {
+        g_starter_cooldown_until_ms = millis() + STARTER_COOLDOWN_MS;
+    }
+    g_state = STATE_IDLE_SAFE;
+}
+
+/* Accessory outputs (lights, smoke, ...). These are NON-safety and are
+ * deliberately kept out of the kill/start/throttle state machine: they simply
+ * track their command-flag levels on every valid packet, so a dropped packet
+ * only delays a change by one TX period and self-heals. Cruise (CMD_FLAG_CRUISE)
+ * needs no action here - the handle already froze the throttle it sent, so the
+ * value flows through the normal rate-limited throttle path transparently. */
+static void apply_aux_outputs(const throttle_packet_t *pkt) {
+    bool aux1 = (pkt->flags & CMD_FLAG_AUX1) != 0;
+    bool aux2 = (pkt->flags & CMD_FLAG_AUX2) != 0;
+    // HAL_GPIO_WritePin(AUX1_OUT_GPIO_Port, AUX1_OUT_Pin, aux1 ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    // HAL_GPIO_WritePin(AUX2_OUT_GPIO_Port, AUX2_OUT_Pin, aux2 ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    (void)aux1; (void)aux2;
+}
+
+/* --- Local battery monitor (receiver side) --- identical scheme to the
+ * handle, on this unit's own pack: LED bar on from power-up, piezo when low. */
+static uint16_t read_battery_mv(void) {
+    // uint32_t raw = HAL_ADC_GetValue(&hadc_batt);
+    // return (uint16_t)(raw * ADC_MV_PER_LSB * DIVIDER_RATIO);
+    return RX_BATT.full_mv; /* placeholder: pretend full */
+}
+
+static void set_battery_leds(uint8_t lit) {
+    (void)lit; /* drive the bar-graph LED GPIOs: light 'lit' of RX_BATT.led_count */
+}
+
+static void set_buzzer(bool on) {
+    (void)on;  /* drive the piezo GPIO (or start/stop a PWM tone) */
+}
+
+static void battery_tick(void) {
+    uint32_t now = millis();
+    if ((now - g_batt_last_poll_ms) >= BATTERY_POLL_MS) {
+        g_batt_last_poll_ms = now;
+        battery_status_t st = battery_eval(read_battery_mv(), &RX_BATT);
+        set_battery_leds(st.leds_lit);
+        g_batt_low = st.low;
+    }
+    set_buzzer(battery_buzzer_on(g_batt_low, now));
 }
 
 /* Sequence check accounting for 0-255 rollover.
@@ -102,8 +184,10 @@ static void handle_valid_packet(const throttle_packet_t *pkt) {
     /* --- 1. KILL: highest priority, checked before anything else --- */
     if (pkt->flags & CMD_FLAG_KILL) {
         cut_ignition();
+        set_starter(false);            /* kill also aborts any crank in progress */
         g_state = STATE_KILLED;
         g_target_throttle = IDLE_THROTTLE_VALUE;
+        g_start_req_prev = true;       /* suppress a spurious rising edge if kill+start ever coincide */
         return; /* ignore throttle/start fields in this packet entirely */
     }
 
@@ -113,29 +197,31 @@ static void handle_valid_packet(const throttle_packet_t *pkt) {
         return;
     }
 
-    /* --- 2. START: only actionable from IDLE_SAFE, only if throttle at idle,
-     *        and only if link isn't currently in a post-loss recovery window --- */
-    if ((pkt->flags & CMD_FLAG_START_REQ) &&
+    /* --- 2. START (manual crank): energize the starter on the RISING EDGE of a
+     *        hold-confirmed start request, and keep it cranking while the button
+     *        is held; releasing it (or a safety limit in crank_tick) stops it.
+     *        Edge-triggered so that after a max-crank cutoff the pilot must
+     *        release and re-press rather than re-cranking while still held.
+     *        Gated: only from IDLE_SAFE, only at idle throttle, not during
+     *        post-loss recovery, and not during a post-forced-stop cooldown. --- */
+    bool start_req = (pkt->flags & CMD_FLAG_START_REQ) != 0;
+    if (start_req && !g_start_req_prev &&
         g_state == STATE_IDLE_SAFE &&
         pkt->throttle <= IDLE_THRESHOLD_FOR_START &&
-        !g_recovering_from_loss) {
-        g_state = STATE_STARTING;
-        fire_starter();
-        /* transition to RUNNING should happen once you have some signal the
-         * engine caught (RPM sense, vibration, or just a timed window) -
-         * left as a follow-up depending on what feedback you have available */
+        !g_recovering_from_loss &&
+        (int32_t)(millis() - g_starter_cooldown_until_ms) >= 0) {
+        begin_crank();          /* -> STATE_STARTING; crank_tick + safety net bound it */
+    } else if (!start_req && g_state == STATE_STARTING) {
+        end_crank(false);       /* voluntary release: stop, no cooldown */
     }
+    g_start_req_prev = start_req;
 
-    /* --- 3. THROTTLE: only apply pilot input if we're not mid-recovery --- */
+    /* --- 3. THROTTLE: apply pilot input to the SERVO TARGET only. Throttle
+     *        position never drives state transitions - state is owned by the
+     *        start (crank) and kill paths - so pilot throttle can't interfere
+     *        with cranking or the kill latch. --- */
     if (!g_recovering_from_loss) {
         g_target_throttle = pkt->throttle;
-        if (g_state == STATE_STARTING || g_state == STATE_IDLE_SAFE) {
-            /* leave as-is; state transitions to RUNNING elsewhere once
-               engine-caught confirmation exists */
-        }
-        if (g_state != STATE_KILLED) {
-            g_state = (g_target_throttle > IDLE_THRESHOLD_FOR_START) ? STATE_RUNNING : g_state;
-        }
     }
 
     g_ramping_to_idle = false; /* fresh valid data cancels any in-progress ramp */
@@ -159,7 +245,8 @@ static void on_packet_received(const uint8_t *raw, uint8_t len) {
     g_last_accepted_seq = pkt->seq;
     g_have_first_packet = true;
 
-    handle_valid_packet(pkt);
+    handle_valid_packet(pkt);      /* safety state machine first (kill/start/throttle) */
+    apply_aux_outputs(pkt);        /* then non-safety accessories, always refreshed */
 }
 
 /* Runs independently of packet reception - this is what protects you
@@ -201,6 +288,25 @@ static void watchdog_tick(void) {
     }
 }
 
+/* Bounds a crank in progress. Runs every control tick, independent of packet
+ * arrival (like watchdog_tick), so a crank is stopped even if packets stop
+ * coming. No-op unless we're STARTING. Two safety limits, both forced stops:
+ *   - loss of signal (no valid packet for CRANK_LOSS_ABORT_MS): the pilot can't
+ *     command kill wirelessly while the link is down, so don't crank blind;
+ *   - max-crank backstop (MAX_CRANK_MS): a crank can never run away, even if the
+ *     start button is held or a fault leaves START_REQ stuck asserted. */
+static void crank_tick(void) {
+    if (g_state != STATE_STARTING) return;
+
+    uint32_t now = millis();
+    bool link_lost = (now - g_last_valid_packet_ms) >= CRANK_LOSS_ABORT_MS;
+    bool too_long  = (now - g_crank_start_ms)       >= MAX_CRANK_MS;
+
+    if (link_lost || too_long) {
+        end_crank(true);   /* forced -> imposes cooldown */
+    }
+}
+
 int receiver_firmware_main(void) {
     /* --- Init section (fill in) ---
      * HAL_Init(); SystemClock_Config(); MX_GPIO_Init(); MX_TIM_PWM_Init();
@@ -226,9 +332,17 @@ int receiver_firmware_main(void) {
         if (now != last_tick) { /* run watchdog + servo step roughly once per ms tick, adjust to your loop rate */
             last_tick = now;
             watchdog_tick();
+            crank_tick();
+            /* Safety net: the starter must never be energized unless we are
+             * actively cranking. Belt-and-suspenders against any path that
+             * leaves STATE_STARTING without calling end_crank(). */
+            if (g_state != STATE_STARTING) {
+                set_starter(false);
+            }
             if (!g_ramping_to_idle && g_state != STATE_KILLED) {
                 step_toward_target(g_target_throttle);
             }
+            battery_tick(); /* independent of packet arrival; non-blocking */
         }
     }
 }

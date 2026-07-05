@@ -63,7 +63,7 @@ All thresholds and ramp durations are **fixed compile-time constants**, tuned du
 - **nRF24L01+PA+LNA** (not bare module) — range margin needed given outdoor use, body/frame in the RF path. Buy from reputable supplier (Mouser/DigiKey), not cheap clones, given safety-critical context.
 
 ## Open Items / Not Yet Decided
-- What signal indicates "engine caught" to transition `STARTING` → `RUNNING`? (RPM sense, vibration switch, or timed window — needs to be picked before that transition can be implemented)
+- ~~What signal indicates "engine caught" to transition `STARTING` → `RUNNING`?~~ RESOLVED (ADR 0007): start is **manual** — the pilot is the catch sensor, so there is no `STARTING` → `RUNNING` transition and no tach in the controller.
 - Actual measured distance/RF environment between handle and remote unit (through frame/cage/body) — determines whether PA+LNA gives enough margin
 - Final servo selection pending cable force measurement
 - Whether kill command should get an ack/confirmed-delivery path
