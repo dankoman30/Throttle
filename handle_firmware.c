@@ -147,9 +147,12 @@ static bool read_aux2_switch(void) { /* e.g. smoke: closed = on */
  *   - Engaging captures the current trigger position as the setpoint; while
  *     engaged we transmit that frozen value instead of the live trigger, so
  *     the pilot can release the trigger and the throttle holds.
- *   - Cruise drops on: kill (always), a second button press, or the trigger
- *     moving more than CRUISE_DISENGAGE_THROTTLE_DELTA from the setpoint in
- *     either direction (pilot overrides by pulling more or backing off).
+ *   - Cruise drops on: kill (always), a second button press, or the pilot
+ *     pulling the trigger ABOVE the setpoint by more than
+ *     CRUISE_DISENGAGE_THROTTLE_DELTA (an override to take manual control /
+ *     accelerate). Releasing the trigger BELOW the setpoint is exactly what
+ *     cruise is for and does NOT disengage - that's how the pilot rests their
+ *     hand. To reduce throttle, press the cruise button or kill.
  * Returns the throttle value that should actually be transmitted this packet.
  * Kill must be evaluated (g_kill_latched set) BEFORE calling this. */
 static uint8_t apply_cruise(uint8_t live_throttle) {
@@ -173,10 +176,9 @@ static uint8_t apply_cruise(uint8_t live_throttle) {
     }
 
     if (g_cruise_engaged) {
-        int16_t delta = (int16_t)live_throttle - (int16_t)g_cruise_setpoint;
-        if (delta < 0) delta = -delta;
-        if (delta > CRUISE_DISENGAGE_THROTTLE_DELTA) {
-            g_cruise_engaged = false;       /* trigger moved -> pilot overrides */
+        /* upward override only; use int math so setpoint+delta can't wrap */
+        if ((int)live_throttle > (int)g_cruise_setpoint + CRUISE_DISENGAGE_THROTTLE_DELTA) {
+            g_cruise_engaged = false;       /* pilot pulled past hold point -> manual */
         }
     }
 

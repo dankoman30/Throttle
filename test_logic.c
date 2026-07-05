@@ -54,9 +54,7 @@ static uint8_t cruise_step(cruise_t *c, bool btn, uint8_t live) {
         }
     }
     if (c->engaged) {
-        int16_t d = (int16_t)live - (int16_t)c->setpoint;
-        if (d < 0) d = -d;
-        if (d > CRUISE_DISENGAGE_THROTTLE_DELTA) c->engaged = false;
+        if ((int)live > (int)c->setpoint + CRUISE_DISENGAGE_THROTTLE_DELTA) c->engaged = false;
     }
     return c->engaged ? c->setpoint : live;
 }
@@ -93,16 +91,17 @@ int main(void) {
     CHECK(!battery_buzzer_on(true, BATTERY_BUZZ_PERIOD_MS - 1));
     CHECK(battery_buzzer_on(true, BATTERY_BUZZ_PERIOD_MS));         /* next period */
 
-    /* --- cruise: engage holds setpoint through trigger release --- */
+    /* --- cruise: engage holds setpoint through trigger RELEASE (the point) --- */
     { cruise_t c = {0};
       CHECK(cruise_step(&c, false, 120) == 120);   /* no button: passthrough */
       CHECK(cruise_step(&c, true, 120) == 120);    /* press engages at 120 */
       CHECK(c.engaged && c.setpoint == 120);
-      CHECK(cruise_step(&c, false, 0) == 120);     /* trigger released -> still 120 */
-      CHECK(cruise_step(&c, false, 122) == 120);   /* tiny jitter within delta -> held */
+      CHECK(cruise_step(&c, false, 0) == 120);     /* trigger fully released -> still 120 */
+      CHECK(cruise_step(&c, false, 60) == 120);    /* partial squeeze below hold -> still 120 */
+      CHECK(cruise_step(&c, false, 125) == 120);   /* small pull within delta -> held */
       CHECK(c.engaged);
     }
-    /* --- cruise: moving trigger past delta disengages, follows live --- */
+    /* --- cruise: pulling ABOVE setpoint+delta overrides to manual, follows live --- */
     { cruise_t c = {0};
       cruise_step(&c, true, 120);                  /* engage @120 */
       uint8_t out = cruise_step(&c, false, 120 + CRUISE_DISENGAGE_THROTTLE_DELTA + 1);
