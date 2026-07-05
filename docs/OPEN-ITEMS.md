@@ -25,6 +25,17 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   state machine; decide whether smoke must be force-gated in firmware.
 - [ ] **Confirm mechanical kill wiring** is independent of the MCU and grounds
   the ignition line with zero power to electronics (backup for a dead radio).
+- [ ] **Engine ignition EMI characterization (high priority).** With the receiver
+  mounted in its real location next to the engine, sweep the full RPM range and
+  log **consecutive** packet losses (not just loss rate) vs RPM. This is the
+  failure mode most likely to trip the watchdog in flight: EMI-corrupted packets
+  are discarded (safe), but sustained loss in an RPM band ramps throttle toward
+  idle. ~14 consecutive losses (175 ms at 80 Hz) is the threshold-A budget. See
+  `docs/decisions/0005-radio-choice-and-ignition-emi.md`.
+- [ ] **Harden the kill line against EMI** — fail-safe NC kill runs near the CDI;
+  coupled noise can pull it toward "kill". `KILL_DEBOUNCE_MS` rejects short
+  spikes but not sustained EMI. Add ferrite chokes + twisted/shielded kill
+  wiring and route away from the CDI/coil.
 
 ## Hardware decisions
 
@@ -32,7 +43,16 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   a fish scale across the full stroke before ordering (~15–25 kg·cm digital
   metal-gear, continuous-duty ballpark).
 - [ ] **RF range test** — measure real handle↔receiver distance/reliability
-  through frame/cage/body to confirm nRF24L01+PA+LNA gives enough margin.
+  through frame/cage/body to confirm nRF24L01+PA+LNA gives enough margin. NOTE:
+  this is a *separate* test from the engine-EMI RPM sweep above — different
+  cause (path attenuation vs broadband ignition noise), different fix (band/power
+  vs source suppression). Don't conflate the results.
+- [ ] **Ignition EMI mitigations** — resistor plug cap/lead, receiver+antenna
+  placement away from coil/CDI, ferrites on power/kill leads, CDI/coil grounding,
+  receiver supply decoupling. Source suppression first (see ADR 0005).
+- [ ] **Channel selection** — pick a channel clear of both local WiFi and the
+  engine's worst harmonic bands; consider scanning on boot. Buy the module from a
+  reputable supplier (not clones — mismatched PA/LNA erases the margin).
 - [ ] **Battery profiles + divider ratios** — replace placeholder mV values in
   `HANDLE_BATT` / `RX_BATT` and the `read_battery_mv()` scaling with measured
   values for the actual packs on each side.
@@ -52,6 +72,10 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
 - [ ] Generate the STM32CubeIDE projects (none committed yet).
 - [ ] Open question: does **kill** warrant a confirmed-delivery/ack path, versus
   the current fixed-rate send + latch? See `docs/decisions/0001-no-radio-ack.md`.
+- [ ] Low priority: evaluate **CRC8 → CRC16** given the EMI environment (packet
+  5→6 bytes). CRC8 is defensible today — sync + seq filtering plus throttle
+  rate-limiting contain any single false-accept — but worth revisiting if the
+  RPM-sweep test shows heavy corruption. See ADR 0005.
 
 ## Licensing / legal
 
