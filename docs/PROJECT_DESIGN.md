@@ -14,8 +14,16 @@ Drive-by-wire paramotor throttle. Handle-mounted STM32 reads trigger position + 
 **Remote unit**
 - STM32 (same board family as handle for prototyping)
 - Receives packets, validates, runs state machine
-- Drives servo (rate-limited) which pulls throttle cable
+- Drives a **remote-mounted servo** (rate-limited) that actuates the engine's throttle **through a cable** (see below)
 - Independent watchdog timer for loss-of-signal handling
+
+**Throttle actuation — remote-mounted servo + cable (important)**
+- The servo is **NOT mounted at the engine's throttle/carburetor**. It is mounted somewhere convenient on the frame/cage and connected to the engine throttle arm by a **push-pull / Bowden cable**. This is a deliberate design choice:
+  - **Space:** the area right at the carb throttle is cramped; remote mounting gives placement freedom.
+  - **Vibration:** keeping the servo off the engine spares it the worst of the 2-stroke vibration (fewer failures, better servo life).
+  - **Serviceability / RF:** the receiver + servo can sit where wiring, antenna placement, and cooling are easier.
+- **Fail-safe direction:** the carburetor's own **return spring pulls the throttle to idle**; the servo pulls *against* it to open. So a depowered servo, a servo failure, or a detached/broken actuation cable lets the spring return the engine to **idle** — the mechanical counterpart of the loss-of-signal watchdog. Confirm the throttle has a positive return-to-idle spring and that the linkage can never jam open.
+- **Consequences to design for:** the Bowden cable adds **friction/stiction** (measure pull force through the *full installed cable run*, not the bare throttle cable), routing must avoid tight bends, and the run must tolerate **engine movement** on its rubber mounts (the engine shifts relative to the frame). Full servo travel must still map to the full throttle stroke after any cable slack/stretch.
 
 **Mechanical backup kill switch**
 - Completely independent of MCU/radio — wired directly into the ignition kill line (grounds CDI/kill wire on most 2-stroke setups)
@@ -59,7 +67,7 @@ All thresholds and ramp durations are **fixed compile-time constants**, tuned du
 ## Design Decisions Log
 - **No radio-level ack** (`setAutoAck(false)`) — fixed-rate send + sequence number + watchdog covers command delivery without ack round-trip latency. Open question: revisit for kill specifically if confirmed-delivery matters more there.
 - **CRC8/MAXIM chosen** over rolling custom checksum — small, well-tested, easy to hand-verify against known test vectors.
-- **Servo spec** — pull force/travel must be measured directly off the actual throttle cable (fish scale across full stroke, not just one point) before ordering. Ballpark 15–25kg·cm digital metal-gear servo, continuous-duty rated.
+- **Servo spec** — pull force/travel must be measured across the full stroke (fish scale, not just one point) **through the full installed cable run** (remote mount adds Bowden friction, so measuring the bare throttle cable understates it) before ordering. Ballpark 15–25kg·cm digital metal-gear servo, continuous-duty rated.
 - **nRF24L01+PA+LNA** (not bare module) — range margin needed given outdoor use, body/frame in the RF path. Buy from reputable supplier (Mouser/DigiKey), not cheap clones, given safety-critical context.
 
 ## Open Items / Not Yet Decided

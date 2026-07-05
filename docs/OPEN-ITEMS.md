@@ -51,9 +51,20 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
 
 ## Hardware decisions
 
-- [ ] **Servo selection** — measure actual throttle-cable pull force/travel with
-  a fish scale across the full stroke before ordering (~15–25 kg·cm digital
-  metal-gear, continuous-duty ballpark).
+- [ ] **Servo selection** — measure pull force/travel across the full stroke
+  **through the full installed cable run** (remote mount adds Bowden friction;
+  the bare throttle cable understates it) before ordering (~15–25 kg·cm digital
+  metal-gear, continuous-duty ballpark). See ADR 0008.
+- [ ] **Remote servo mount + cable run (ADR 0008)** — the servo is frame-mounted,
+  not on the engine, and drives the throttle via a push-pull/Bowden cable. To
+  design: servo bracket, cable spec + routing (avoid tight bends), and slack/
+  end-stops so full servo travel = full throttle stroke. `hardware/mechanical/`.
+- [ ] **Confirm throttle return-to-idle spring** — the carb spring must reliably
+  pull to idle when the servo is depowered/failed or the cable detaches (the
+  mechanical fail-safe); verify the linkage can never jam open.
+- [ ] **Cable tolerance to engine movement** — the engine shifts on its rubber
+  mounts relative to the frame; the cable run must flex without binding or
+  shifting the throttle setpoint.
 - [ ] **RF range test** — measure real handle↔receiver distance/reliability
   through frame/cage/body to confirm nRF24L01+PA+LNA gives enough margin. NOTE:
   this is a *separate* test from the engine-EMI RPM sweep above — different
