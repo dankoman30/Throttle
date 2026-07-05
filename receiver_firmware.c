@@ -17,6 +17,7 @@
 #include <stdbool.h>
 #include "throttle_protocol.h"
 #include "crc8.h"
+#include "battery_monitor.h"
 
 typedef enum {
     STATE_IDLE_SAFE,
@@ -41,6 +42,16 @@ static bool      g_recovering_from_loss = false;
 static uint8_t   g_current_servo_throttle = IDLE_THROTTLE_VALUE;
 static uint8_t   g_target_throttle = IDLE_THROTTLE_VALUE;
 
+/* Local battery monitor state (receiver pack only - no telemetry to handle). */
+static uint32_t  g_batt_last_poll_ms = 0;
+static bool      g_batt_low = false;
+
+/* Receiver pack profile. Example: 2S LiFePO4 near the engine; measure real
+ * full/empty/low points and the divider before trusting these numbers. */
+static const battery_profile_t RX_BATT = {
+    .full_mv = 7200, .empty_mv = 5000, .low_mv = 5600, .led_count = 4
+};
+
 static uint32_t millis(void) {
     // return HAL_GetTick();
     return 0; /* placeholder */
@@ -61,6 +72,47 @@ static void cut_ignition(void) {
 static void fire_starter(void) {
     // HAL_GPIO_WritePin(STARTER_RELAY_GPIO_Port, STARTER_RELAY_Pin, GPIO_PIN_SET);
     // consider a bounded pulse duration + cooldown here rather than a raw on/off
+}
+
+/* Accessory outputs (lights, smoke, ...). These are NON-safety and are
+ * deliberately kept out of the kill/start/throttle state machine: they simply
+ * track their command-flag levels on every valid packet, so a dropped packet
+ * only delays a change by one TX period and self-heals. Cruise (CMD_FLAG_CRUISE)
+ * needs no action here - the handle already froze the throttle it sent, so the
+ * value flows through the normal rate-limited throttle path transparently. */
+static void apply_aux_outputs(const throttle_packet_t *pkt) {
+    bool aux1 = (pkt->flags & CMD_FLAG_AUX1) != 0;
+    bool aux2 = (pkt->flags & CMD_FLAG_AUX2) != 0;
+    // HAL_GPIO_WritePin(AUX1_OUT_GPIO_Port, AUX1_OUT_Pin, aux1 ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    // HAL_GPIO_WritePin(AUX2_OUT_GPIO_Port, AUX2_OUT_Pin, aux2 ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    (void)aux1; (void)aux2;
+}
+
+/* --- Local battery monitor (receiver side) --- identical scheme to the
+ * handle, on this unit's own pack: LED bar on from power-up, piezo when low. */
+static uint16_t read_battery_mv(void) {
+    // uint32_t raw = HAL_ADC_GetValue(&hadc_batt);
+    // return (uint16_t)(raw * ADC_MV_PER_LSB * DIVIDER_RATIO);
+    return RX_BATT.full_mv; /* placeholder: pretend full */
+}
+
+static void set_battery_leds(uint8_t lit) {
+    (void)lit; /* drive the bar-graph LED GPIOs: light 'lit' of RX_BATT.led_count */
+}
+
+static void set_buzzer(bool on) {
+    (void)on;  /* drive the piezo GPIO (or start/stop a PWM tone) */
+}
+
+static void battery_tick(void) {
+    uint32_t now = millis();
+    if ((now - g_batt_last_poll_ms) >= BATTERY_POLL_MS) {
+        g_batt_last_poll_ms = now;
+        battery_status_t st = battery_eval(read_battery_mv(), &RX_BATT);
+        set_battery_leds(st.leds_lit);
+        g_batt_low = st.low;
+    }
+    set_buzzer(battery_buzzer_on(g_batt_low, now));
 }
 
 /* Sequence check accounting for 0-255 rollover.
@@ -159,7 +211,8 @@ static void on_packet_received(const uint8_t *raw, uint8_t len) {
     g_last_accepted_seq = pkt->seq;
     g_have_first_packet = true;
 
-    handle_valid_packet(pkt);
+    handle_valid_packet(pkt);      /* safety state machine first (kill/start/throttle) */
+    apply_aux_outputs(pkt);        /* then non-safety accessories, always refreshed */
 }
 
 /* Runs independently of packet reception - this is what protects you
@@ -229,6 +282,7 @@ int receiver_firmware_main(void) {
             if (!g_ramping_to_idle && g_state != STATE_KILLED) {
                 step_toward_target(g_target_throttle);
             }
+            battery_tick(); /* independent of packet arrival; non-blocking */
         }
     }
 }

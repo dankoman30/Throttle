@@ -11,10 +11,24 @@
 
 #define PACKET_SYNC_BYTE      0xA5u   /* arbitrary fixed marker, first byte of every packet */
 
-/* Command flag bits (packet.flags) */
-#define CMD_FLAG_KILL         (1u << 0)
-#define CMD_FLAG_START_REQ    (1u << 1)
-/* bits 2-7 reserved for future use (e.g. arm/disarm, telemetry request) */
+/* Command flag bits (packet.flags).
+ * These are the LOGICAL states the receiver acts on ("this function is
+ * requested/active"), NOT the raw electrical level of any switch. The handle
+ * firmware is responsible for mapping each physical momentary/rocker switch
+ * (and its open=on / closed=off wiring) into these bits, so the receiver
+ * never has to know how the handle is wired. */
+#define CMD_FLAG_KILL         (1u << 0)   /* cut ignition, latch KILLED */
+#define CMD_FLAG_START_REQ    (1u << 1)   /* hold-confirmed start request */
+#define CMD_FLAG_CRUISE       (1u << 2)   /* throttle is being held at a cruise setpoint */
+#define CMD_FLAG_AUX1         (1u << 3)   /* accessory 1 (e.g. lights) - level, on while set */
+#define CMD_FLAG_AUX2         (1u << 4)   /* accessory 2 (e.g. smoke)  - level, on while set */
+/* bits 5-7 reserved for future use */
+
+/* Cruise control (resolved on the HANDLE; see handle_firmware.c).
+ * Cruise freezes the transmitted throttle at the value captured when engaged.
+ * It disengages on: a second cruise-button press, kill, or the trigger moving
+ * more than CRUISE_DISENGAGE_THROTTLE_DELTA away from the frozen setpoint. */
+#define CRUISE_DISENGAGE_THROTTLE_DELTA  10  /* 0-255 units; trigger move beyond this drops cruise */
 
 #pragma pack(push, 1)
 typedef struct {
