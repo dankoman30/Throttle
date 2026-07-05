@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Copyright (C) 2026 Daniel Koman */
 #ifndef THROTTLE_PROTOCOL_H
 #define THROTTLE_PROTOCOL_H
 

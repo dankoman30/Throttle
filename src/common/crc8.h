@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Copyright (C) 2026 Daniel Koman */
 #ifndef CRC8_H
 #define CRC8_H
 

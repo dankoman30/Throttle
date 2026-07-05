@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Copyright (C) 2026 Daniel Koman */
 #ifndef BATTERY_MONITOR_H
 #define BATTERY_MONITOR_H
 

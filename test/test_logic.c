@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Copyright (C) 2026 Daniel Koman */
 /* ---------------------------------------------------------------------
  * test_logic.c - host-side sanity tests for the PURE logic pieces.
  * No hardware, no HAL. Build and run on your PC:
