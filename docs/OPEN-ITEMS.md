@@ -8,10 +8,13 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
 
 ## Safety-critical / blocks flight-readiness
 
-- [ ] **Engine-caught detection (`STARTING` → `RUNNING`).** Decide the signal
-  (RPM sense / vibration switch / timed window) and implement the transition in
-  `src/receiver/receiver_firmware.c` (`handle_valid_packet`, marked as a
-  follow-up in the code). Until done, the project is **not flight-ready**.
+- [~] **Engine-caught detection (`STARTING` → `RUNNING`).** Approach chosen:
+  **real RPM** from the plug-lead inductive tach pickup (Moster 185). Plan:
+  after `fire_starter`, watch RPM; if it climbs past a "caught" threshold and
+  holds for N ms → `RUNNING`; if not within a timeout → stop cranking (bounded
+  starter pulse). Still to do: tach-conditioning circuit (see hardware), pick
+  thresholds/timeout, implement in `receiver_firmware.c`, don't over-trust a
+  single noisy reading. Until implemented, the project is **not flight-ready**.
 - [ ] **Bench-verify fail-safe kill.** Confirm on real hardware that a
   disconnected/broken kill wire reads as KILL (normally-closed + pull-up, open =
   HIGH = kill). Verify latch + `KILL_DEBOUNCE_MS` rejects vibration glitches but
@@ -53,11 +56,28 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
 - [ ] **Channel selection** — pick a channel clear of both local WiFi and the
   engine's worst harmonic bands; consider scanning on boot. Buy the module from a
   reputable supplier (not clones — mismatched PA/LNA erases the margin).
-- [ ] **Battery profiles + divider ratios** — replace placeholder mV values in
-  `HANDLE_BATT` / `RX_BATT` and the `read_battery_mv()` scaling with measured
-  values for the actual packs on each side.
-- [ ] **Kill relay + starter relay drive circuits** — design; add a bounded
-  starter pulse duration + cooldown (noted in `fire_starter`).
+- [x] **Receiver power source** — dedicated receiver battery (isolated from the
+  engine's starter battery to avoid crank brown-out / EMI). See ADR 0005.
+- [ ] **Servo power architecture (decision)** — servo transients are large; decide
+  between (a) servo on the receiver pack via a dedicated BEC/regulator rail with
+  bulk capacitance while MCU+radio sit on a cleaner rail, or (b) a separate servo
+  battery. Sized after servo selection.
+- [ ] **Battery chemistry/voltage per pack** — pick handle + receiver packs, then
+  replace placeholder mV values in `HANDLE_BATT` / `RX_BATT` and the
+  `read_battery_mv()` divider scaling with measured values.
+- [ ] **Engine interface — isolation strategy (decision).** Recommend driving
+  kill + starter through **relays or opto-isolated SSRs**, not bare MOSFETs, so
+  receiver-ground stays isolated from the noisy engine-ground / starter domain.
+  Confirm this before laying out the receiver board.
+- [ ] **Kill driver** — relay/opto that grounds the CDI kill wire (parallels the
+  independent mechanical kill; energize-to-kill, mechanical path is the zero-power
+  fail-safe). Need the Moster 185 CDI kill-wire voltage/behavior to spec it.
+- [ ] **Starter driver** — relay/opto to the engine-battery starter *solenoid*
+  coil (flyback diode across coil); bounded pulse + cooldown in firmware. Need
+  solenoid coil voltage/current.
+- [ ] **Tach-conditioning circuit** — clamp/TVS + series R + squaring stage to
+  turn the plug-lead pickup's spiky pulses into a clean 3.3 V logic edge for a
+  timer input-capture pin. Feeds engine-caught detection above.
 - [ ] **Connectors** — locking, vibration-rated (JST-SM minimum;
   Deutsch/Amphenol preferred).
 - [ ] **Battery readout wiring** — 3/4-LED bar + piezo buzzer per side.
@@ -66,8 +86,16 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
 
 ## Firmware TODOs
 
-- [ ] Wire HAL peripheral inits (ADC, GPIO, TIM PWM) marked `/* fill in */`.
-- [ ] RF24 HAL port (TMRh20 is Arduino-first) for both ends.
+- [x] Framework chosen: **STM32 HAL + CubeIDE**, Nucleo-32 L432KC dev board
+  (ADR 0006). Arduino/STM32duino deliberately not used.
+- [ ] Install STM32CubeIDE (bundles CubeMX); ST-Link is built into the Nucleo.
+- [ ] Verify Nucleo-32 L432KC has enough pins/peripherals for both ends
+  (pin-map exercise — handle I/O is fully known from firmware; receiver I/O
+  partly depends on engine facts below). Bump to Nucleo-64 if short.
+- [ ] Generate the two CubeMX projects and wire HAL peripheral inits
+  (ADC, GPIO, TIM PWM, SPI) marked `/* fill in */`.
+- [ ] RF24 HAL port (TMRh20 is Arduino-first) for both ends — stays on the
+  critical path given the HAL choice.
 - [ ] Servo PWM mapping: 0–255 throttle → pulse-width for the chosen servo.
 - [ ] Generate the STM32CubeIDE projects (none committed yet).
 - [ ] Open question: does **kill** warrant a confirmed-delivery/ack path, versus
