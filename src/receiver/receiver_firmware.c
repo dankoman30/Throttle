@@ -136,7 +136,9 @@ static void set_buzzer(bool on) {
 
 static void battery_tick(void) {
     uint32_t now = millis();
-    if ((now - g_batt_last_poll_ms) >= BATTERY_POLL_MS) {
+    static bool first = true;   /* poll once immediately so the LED bar lights at power-on */
+    if (first || (now - g_batt_last_poll_ms) >= BATTERY_POLL_MS) {
+        first = false;
         g_batt_last_poll_ms = now;
         battery_status_t st = battery_eval(read_battery_mv(), &RX_BATT);
         set_battery_leds(st.leds_lit);
@@ -187,6 +189,7 @@ static void handle_valid_packet(const throttle_packet_t *pkt) {
         set_starter(false);            /* kill also aborts any crank in progress */
         g_state = STATE_KILLED;
         g_target_throttle = IDLE_THROTTLE_VALUE;
+        g_ramping_to_idle = false;     /* cancel any watchdog ramp so the servo is driven to idle below */
         g_start_req_prev = true;       /* suppress a spurious rising edge if kill+start ever coincide */
         return; /* ignore throttle/start fields in this packet entirely */
     }
@@ -275,14 +278,17 @@ static void watchdog_tick(void) {
             g_ramp_start_throttle = g_current_servo_throttle;
         }
         uint32_t elapsed = millis() - g_ramp_start_ms;
-        if (elapsed >= RAMP_TO_IDLE_DURATION_MS) {
+        if (elapsed >= RAMP_TO_IDLE_DURATION_MS || g_ramp_start_throttle <= IDLE_THROTTLE_VALUE) {
             set_servo_throttle(IDLE_THROTTLE_VALUE);
         } else {
-            /* linear ramp from ramp_start_throttle down to idle over
-               RAMP_TO_IDLE_DURATION_MS - fixed, not tunable in flight */
+            /* linear ramp from ramp_start_throttle down to IDLE_THROTTLE_VALUE
+               over RAMP_TO_IDLE_DURATION_MS - fixed, not tunable in flight.
+               Interpolate against IDLE_THROTTLE_VALUE (not 0) so a non-zero idle
+               mapping still ramps to idle, never below it. */
             uint32_t remaining_frac_num = (RAMP_TO_IDLE_DURATION_MS - elapsed);
-            uint8_t value = (uint8_t)((uint32_t)g_ramp_start_throttle * remaining_frac_num
-                                       / RAMP_TO_IDLE_DURATION_MS);
+            uint32_t span = (uint32_t)(g_ramp_start_throttle - IDLE_THROTTLE_VALUE);
+            uint8_t value = (uint8_t)(IDLE_THROTTLE_VALUE
+                                       + span * remaining_frac_num / RAMP_TO_IDLE_DURATION_MS);
             set_servo_throttle(value);
         }
     }
@@ -339,7 +345,12 @@ int receiver_firmware_main(void) {
             if (g_state != STATE_STARTING) {
                 set_starter(false);
             }
-            if (!g_ramping_to_idle && g_state != STATE_KILLED) {
+            /* Drive the servo toward the target every tick (unless the watchdog
+             * is mid-ramp, which sets the servo itself). This runs in
+             * STATE_KILLED too: on kill the target is idle, so the throttle is
+             * actively closed - defense in depth if the electronic ignition-cut
+             * ever fails - rather than left frozen wherever it was. */
+            if (!g_ramping_to_idle) {
                 step_toward_target(g_target_throttle);
             }
             battery_tick(); /* independent of packet arrival; non-blocking */
