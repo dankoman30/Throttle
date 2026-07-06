@@ -114,7 +114,19 @@ static uint8_t read_throttle_position(void) {
     /* map 0-4095 -> 0-255; adjust min/max to your actual trigger travel
      * (measure real ADC min/max at full release / full pull, don't assume rails) */
     uint8_t mapped = (uint8_t)((smoothed * 255) / 4095);
-    return mapped;
+
+    /* Deadband / hysteresis: hold the last transmitted value unless the trigger
+     * moved at least THROTTLE_DEADBAND, so hand/engine vibration doesn't make the
+     * servo hunt. Each servo position thus owns a band of trigger values. The
+     * rails (0, 255) always update so full idle and full throttle stay exactly
+     * reachable. Complements the EMA above and the receiver's rate-limiter. */
+    static uint8_t last_out = 0;
+    int diff = (int)mapped - (int)last_out;
+    if (diff < 0) diff = -diff;
+    if (mapped == 0 || mapped == 255 || diff >= THROTTLE_DEADBAND) {
+        last_out = mapped;
+    }
+    return last_out;
 }
 
 /* Returns true when kill is being REQUESTED. Wired FAIL-SAFE: the kill switch

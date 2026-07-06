@@ -94,6 +94,13 @@ static void crk_tick(crk_t *c, bool link_lost, uint32_t now) {
     }
 }
 
+/* --- mirror of handle_firmware.c throttle deadband/hysteresis --- */
+static uint8_t deadband(uint8_t mapped, uint8_t *last) {
+    int diff = (int)mapped - (int)*last; if (diff < 0) diff = -diff;
+    if (mapped == 0 || mapped == 255 || diff >= THROTTLE_DEADBAND) *last = mapped;
+    return *last;
+}
+
 /* --- mirror of handle_firmware.c:debounce_update --- */
 typedef struct { bool raw_last; bool stable; uint32_t last_change; } db_t;
 static bool db_update(db_t *d, bool raw, uint32_t now) {
@@ -222,6 +229,19 @@ int main(void) {
       crk_packet(&c, true,  true, false, 4000); CHECK(c.state == S_IDLE);  /* still cooling down */
       crk_packet(&c, false, true, false, 4500);                           /* release to re-arm the edge */
       crk_packet(&c, true,  true, false, 5000); CHECK(c.state == S_START); /* cooldown elapsed */
+    }
+
+    /* --- throttle deadband/hysteresis: small jitter held, larger moves pass --- */
+    { uint8_t last = 100;
+      CHECK(deadband(100 + THROTTLE_DEADBAND - 1, &last) == 100);   /* within band (above) -> held */
+      CHECK(deadband(100 - (THROTTLE_DEADBAND - 1), &last) == 100); /* within band (below) -> held */
+      CHECK(deadband(100 + THROTTLE_DEADBAND, &last) == 100 + THROTTLE_DEADBAND); /* moved enough */
+    }
+    /* --- rails always reachable despite the deadband --- */
+    { uint8_t last = 2;
+      CHECK(deadband(0, &last) == 0);       /* snaps to full idle even if within band */
+      last = 253;
+      CHECK(deadband(255, &last) == 255);   /* snaps to full throttle */
     }
 
     /* --- input debounce: state changes only after INPUT_DEBOUNCE_MS stable --- */
