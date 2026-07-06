@@ -117,6 +117,15 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
 - [ ] RF24 HAL port (TMRh20 is Arduino-first) for both ends — stays on the
   critical path given the HAL choice.
 - [ ] Servo PWM mapping: 0–255 throttle → pulse-width for the chosen servo.
+- [ ] **Trigger-ADC anti-alias + oversampling.** The trigger is sampled at 80 Hz,
+  so hand/engine vibration above ~40 Hz **aliases** and no software filter can
+  remove it. Add (hardware) an **RC low-pass on the ADC input** as an anti-alias
+  filter, and (firmware) **oversample the ADC faster than 80 Hz and average**
+  before the EMA. The handle already has an EMA + a deadband/hysteresis
+  (`THROTTLE_DEADBAND`) and the receiver rate-limits the servo, but those sit
+  *after* sampling — they don't fix aliased noise. Tune the EMA `FILTER_SHIFT`
+  and `THROTTLE_DEADBAND` on real hardware. (Raised by instructor feedback on
+  servo-from-analog control: debounce, damping, hysteresis.)
 - [ ] Generate the STM32CubeIDE projects (none committed yet).
 - [ ] Open question: does **kill** warrant a confirmed-delivery/ack path, versus
   the current fixed-rate send + latch? See `docs/decisions/0001-no-radio-ack.md`.
