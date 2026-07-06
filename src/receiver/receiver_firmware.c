@@ -278,14 +278,17 @@ static void watchdog_tick(void) {
             g_ramp_start_throttle = g_current_servo_throttle;
         }
         uint32_t elapsed = millis() - g_ramp_start_ms;
-        if (elapsed >= RAMP_TO_IDLE_DURATION_MS) {
+        if (elapsed >= RAMP_TO_IDLE_DURATION_MS || g_ramp_start_throttle <= IDLE_THROTTLE_VALUE) {
             set_servo_throttle(IDLE_THROTTLE_VALUE);
         } else {
-            /* linear ramp from ramp_start_throttle down to idle over
-               RAMP_TO_IDLE_DURATION_MS - fixed, not tunable in flight */
+            /* linear ramp from ramp_start_throttle down to IDLE_THROTTLE_VALUE
+               over RAMP_TO_IDLE_DURATION_MS - fixed, not tunable in flight.
+               Interpolate against IDLE_THROTTLE_VALUE (not 0) so a non-zero idle
+               mapping still ramps to idle, never below it. */
             uint32_t remaining_frac_num = (RAMP_TO_IDLE_DURATION_MS - elapsed);
-            uint8_t value = (uint8_t)((uint32_t)g_ramp_start_throttle * remaining_frac_num
-                                       / RAMP_TO_IDLE_DURATION_MS);
+            uint32_t span = (uint32_t)(g_ramp_start_throttle - IDLE_THROTTLE_VALUE);
+            uint8_t value = (uint8_t)(IDLE_THROTTLE_VALUE
+                                       + span * remaining_frac_num / RAMP_TO_IDLE_DURATION_MS);
             set_servo_throttle(value);
         }
     }
