@@ -94,6 +94,14 @@ static void crk_tick(crk_t *c, bool link_lost, uint32_t now) {
     }
 }
 
+/* --- mirror of handle_firmware.c:debounce_update --- */
+typedef struct { bool raw_last; bool stable; uint32_t last_change; } db_t;
+static bool db_update(db_t *d, bool raw, uint32_t now) {
+    if (raw != d->raw_last) { d->raw_last = raw; d->last_change = now; }
+    if (raw != d->stable && (now - d->last_change) >= INPUT_DEBOUNCE_MS) d->stable = raw;
+    return d->stable;
+}
+
 int main(void) {
     /* --- CRC8/MAXIM known-answer vector --- */
     CHECK(crc8_compute((const uint8_t *)"123456789", 9) == 0xA1);
@@ -214,6 +222,22 @@ int main(void) {
       crk_packet(&c, true,  true, false, 4000); CHECK(c.state == S_IDLE);  /* still cooling down */
       crk_packet(&c, false, true, false, 4500);                           /* release to re-arm the edge */
       crk_packet(&c, true,  true, false, 5000); CHECK(c.state == S_START); /* cooldown elapsed */
+    }
+
+    /* --- input debounce: state changes only after INPUT_DEBOUNCE_MS stable --- */
+    { db_t d = {0};
+      CHECK(!db_update(&d, true, 0));                     /* press seen, not yet stable */
+      CHECK(!db_update(&d, true, INPUT_DEBOUNCE_MS - 1));
+      CHECK(db_update(&d, true, INPUT_DEBOUNCE_MS));      /* stable -> true */
+      CHECK(db_update(&d, false, INPUT_DEBOUNCE_MS + 5)); /* release seen, still true */
+      CHECK(!db_update(&d, false, INPUT_DEBOUNCE_MS + 5 + INPUT_DEBOUNCE_MS)); /* stable -> false */
+    }
+    /* --- input debounce: a bounce that never settles is rejected --- */
+    { db_t d = {0};
+      db_update(&d, true, 0); db_update(&d, false, 5);
+      db_update(&d, true, 8); db_update(&d, false, 12);
+      CHECK(!db_update(&d, true, 15));                    /* last edge at 15, not stable long enough */
+      CHECK(db_update(&d, true, 15 + INPUT_DEBOUNCE_MS)); /* now held stable -> true */
     }
 
     if (g_fail == 0) printf("ALL TESTS PASSED\n");

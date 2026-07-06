@@ -25,6 +25,28 @@
 // extern RF24 radio;                       /* nRF24L01+ instance (RF24 library) */
 // GPIO defines for kill switch input, start button input
 
+/* Generic time-based debounce for momentary/rocker inputs: the raw reading must
+ * stay stable for INPUT_DEBOUNCE_MS before the debounced state changes, rejecting
+ * contact bounce and vibration glitches. Used for the cruise + accessory inputs;
+ * the kill line has its own dedicated debounce (kill_confirmed) because it is
+ * fail-safe/latching. */
+typedef struct {
+    bool     raw_last;
+    bool     stable;
+    uint32_t last_change_ms;
+} debounce_t;
+
+static bool debounce_update(debounce_t *d, bool raw, uint32_t now) {
+    if (raw != d->raw_last) {
+        d->raw_last = raw;
+        d->last_change_ms = now;
+    }
+    if (raw != d->stable && (now - d->last_change_ms) >= INPUT_DEBOUNCE_MS) {
+        d->stable = raw;
+    }
+    return d->stable;
+}
+
 /* --- Local state --- */
 static uint8_t   g_seq = 0;
 static bool      g_start_button_pressed_last = false;
@@ -49,6 +71,11 @@ static uint32_t  g_kill_active_since_ms = 0;
 static bool      g_cruise_engaged = false;
 static uint8_t   g_cruise_setpoint = 0;
 static bool      g_cruise_button_last = false;
+
+/* Debounce state for the cruise button and the two accessory inputs. */
+static debounce_t g_cruise_btn_db;
+static debounce_t g_aux1_db;
+static debounce_t g_aux2_db;
 
 /* Local battery monitor state (this pack only - no telemetry from receiver). */
 static uint32_t  g_batt_last_poll_ms = 0;
@@ -157,8 +184,8 @@ static bool read_aux2_switch(void) { /* e.g. smoke: closed = on */
  *     hand. To reduce throttle, press the cruise button or kill.
  * Returns the throttle value that should actually be transmitted this packet.
  * Kill must be evaluated (g_kill_latched set) BEFORE calling this. */
-static uint8_t apply_cruise(uint8_t live_throttle) {
-    bool btn = read_cruise_button_raw();
+static uint8_t apply_cruise(uint8_t live_throttle, uint32_t now) {
+    bool btn = debounce_update(&g_cruise_btn_db, read_cruise_button_raw(), now);
     bool rising = btn && !g_cruise_button_last;
     g_cruise_button_last = btn;
 
@@ -215,6 +242,7 @@ static bool start_request_confirmed(void) {
 }
 
 static void build_and_send_packet(void) {
+    uint32_t now = millis();
     throttle_packet_t pkt;
     pkt.sync = PACKET_SYNC_BYTE;
     pkt.seq = g_seq++;
@@ -224,7 +252,7 @@ static void build_and_send_packet(void) {
     if (kill_confirmed()) {
         g_kill_latched = true;   /* sticky: never un-latches without a re-arm */
     }
-    pkt.throttle = apply_cruise(read_throttle_position());
+    pkt.throttle = apply_cruise(read_throttle_position(), now);
 
     pkt.flags = 0;
     if (g_kill_latched) {
@@ -237,10 +265,10 @@ static void build_and_send_packet(void) {
         pkt.flags |= CMD_FLAG_START_REQ;
     }
 
-    /* Accessories are independent level flags (lights/smoke) - they ride
-     * alongside whatever the primary command is, including kill. */
-    if (read_aux1_switch()) pkt.flags |= CMD_FLAG_AUX1;
-    if (read_aux2_switch()) pkt.flags |= CMD_FLAG_AUX2;
+    /* Accessories are independent, debounced level flags (lights/smoke) - they
+     * ride alongside whatever the primary command is, including kill. */
+    if (debounce_update(&g_aux1_db, read_aux1_switch(), now)) pkt.flags |= CMD_FLAG_AUX1;
+    if (debounce_update(&g_aux2_db, read_aux2_switch(), now)) pkt.flags |= CMD_FLAG_AUX2;
 
     pkt.crc8 = crc8_compute((const uint8_t *)&pkt, PACKET_CRC_LEN);
 

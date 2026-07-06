@@ -73,6 +73,11 @@ typedef struct {
                                                rejects vibration glitches on the line without defeating fail-safe:
                                                a real press or a genuinely severed wire persists and still latches. */
 
+#define INPUT_DEBOUNCE_MS          20      /* cruise + accessory inputs must read stable this long before the
+                                               debounced state changes - rejects contact bounce so a single cruise
+                                               press can't register as several toggles. (Kill has its own debounce
+                                               above; start has its 600 ms hold, which is inherently debounced.) */
+
 /* ---------------------------------------------------------------------
  * Electric start (receiver-only). MANUAL crank: the starter is energized
  * while the pilot holds the (hold-confirmed) start button and released when
