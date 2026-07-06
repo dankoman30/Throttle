@@ -307,7 +307,9 @@ static void set_buzzer(bool on) {
 
 static void battery_tick(void) {
     uint32_t now = millis();
-    if ((now - g_batt_last_poll_ms) >= BATTERY_POLL_MS) {
+    static bool first = true;   /* poll once immediately so the LED bar lights at power-on */
+    if (first || (now - g_batt_last_poll_ms) >= BATTERY_POLL_MS) {
+        first = false;
         g_batt_last_poll_ms = now;
         battery_status_t st = battery_eval(read_battery_mv(), &HANDLE_BATT);
         set_battery_leds(st.leds_lit);
