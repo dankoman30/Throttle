@@ -187,6 +187,7 @@ static void handle_valid_packet(const throttle_packet_t *pkt) {
         set_starter(false);            /* kill also aborts any crank in progress */
         g_state = STATE_KILLED;
         g_target_throttle = IDLE_THROTTLE_VALUE;
+        g_ramping_to_idle = false;     /* cancel any watchdog ramp so the servo is driven to idle below */
         g_start_req_prev = true;       /* suppress a spurious rising edge if kill+start ever coincide */
         return; /* ignore throttle/start fields in this packet entirely */
     }
@@ -339,7 +340,12 @@ int receiver_firmware_main(void) {
             if (g_state != STATE_STARTING) {
                 set_starter(false);
             }
-            if (!g_ramping_to_idle && g_state != STATE_KILLED) {
+            /* Drive the servo toward the target every tick (unless the watchdog
+             * is mid-ramp, which sets the servo itself). This runs in
+             * STATE_KILLED too: on kill the target is idle, so the throttle is
+             * actively closed - defense in depth if the electronic ignition-cut
+             * ever fails - rather than left frozen wherever it was. */
+            if (!g_ramping_to_idle) {
                 step_toward_target(g_target_throttle);
             }
             battery_tick(); /* independent of packet arrival; non-blocking */
