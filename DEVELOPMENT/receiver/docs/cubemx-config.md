@@ -7,19 +7,38 @@ not doing anything conceptually different from `pinMode()`.
 
 ## 1. Create the project
 
-1. Open STM32CubeIDE → **File → New → STM32 Project**.
-2. **Board Selector** tab (not "MCU Selector" — picking the board
+This install's menu wording differs from older STM32CubeIDE tutorials/docs
+you may find online — confirmed against the release notes and user guide
+(UM2553, UM2609) bundled with this exact install
+(`C:\ST\STM32CubeIDE_2.2.0\STM32CubeIDE\plugins\com.st.stm32cube.ide.documentation_*\docs\`).
+
+1. **File → STM32 Project Create/Import → Create New STM32 Project**.
+2. A popup offers 4 tiles: "STM32CubeIDE empty project", "C Project", "C++
+   Project", "STM32 CMake project". Pick **STM32CubeIDE empty project** —
+   despite the name, this is the STM32Cube/HAL-integrated one with MCU/board
+   selection and the CubeMX peripheral-configuration tool (the plain "C
+   Project"/"C++ Project" tiles are generic Eclipse CDT with no STM32
+   integration at all; "STM32 CMake project" does the same MCU/board
+   selection but builds via CMake instead of CubeIDE's default managed
+   makefile — not what these docs assume).
+3. **Board Selector** tab (not "MCU/MPU Selector" — picking the board
    pre-selects the right pins for the ST-Link, USB, and the on-board LED so
    you don't have to know them) → search `NUCLEO-L432KC` → select it → Next.
-3. Project name: `bench_app` (or similar). **Location**: uncheck "use
+4. Project name: `bench_app` (or similar). **Location**: uncheck "use
    default location" and point it at
    `C:\GitHub\Throttle\DEVELOPMENT\receiver\firmware` directly, so the
    generated project lands in the repo instead of the CubeIDE workspace
-   folder.
-4. Targeted Language: **C**. Finish. Say **Yes** if it asks to initialize all
-   peripherals with their default mode (harmless, we'll override what we
-   need) and **Yes** to open the Device Configuration Tool (the `.ioc`
-   pinout view).
+   folder. **The target directory must be completely empty** — the wizard
+   refuses a non-empty one. If `bench_app.c`/`bench_app.h` are already
+   sitting in there from a previous step, move them out temporarily, create
+   the project into the now-empty folder, then move them into the
+   generated `Core/Src`/`Core/Inc` afterward (step 8 below).
+5. Targeted Language: **C**. Targeted Binary Type: leave the preselected
+   **Executable** (not "Static library" — that produces a `.a` meant to be
+   linked into another project, not a standalone flashable image). Finish.
+   Say **Yes** if it asks to initialize all peripherals with their default
+   mode (harmless, we'll override what we need) and **Yes** to open the
+   Device Configuration Tool (the `.ioc` pinout view).
 
 ## 2. Pin configuration (Device Configuration Tool → Pinout & Configuration)
 
