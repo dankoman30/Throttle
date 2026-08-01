@@ -49,7 +49,7 @@ a shortcut.
 
 | Output | Behavior |
 |---|---|
-| **Servo (PA0/TIM2_CH1)** | Reads `g_current_servo_throttle` (post rate-limit/ramp) every tick, maps 0–255 → 1000–2000µs pulse. |
+| **Servo (PA5/TIM2_CH1)** | Reads `g_current_servo_throttle` (post rate-limit/ramp) every tick, maps 0–255 → 1000–2000µs pulse. |
 | **7-segment** | `g_current_servo_throttle * 10 / 256` → a coarse 0–9 readout. This is deliberately coarse (one digit can't show 0–255 or even 0–100) — good enough to confirm direction/rough level on the bench, not a precision readout. Blinks (all segments off ~half the time) while `STATE_KILLED`. |
 | **Buzzer** | Short beep (`BENCH_BEEP_MS`) on entering `STATE_KILLED` or `STATE_STARTING`. No tone shaping — passive piezo on this rig just clicks. |
 | **Red LED** | On for the entire `STATE_KILLED` duration. |

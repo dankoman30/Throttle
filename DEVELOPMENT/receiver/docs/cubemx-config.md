@@ -31,22 +31,27 @@ needs plain STM32CubeMX.)
 
 ## 2. Pin configuration (Pinout & Configuration tab)
 
+**Do not touch PA0, PA2, PA13, PA14, PA15, or PB3** — all locked/reserved by
+this board (ST-Link SWD, VCP UART, on-board LED, MCO clock-in — see
+`wiring.md`). Leave them at whatever CubeMX defaults to. Also note **PB2
+doesn't exist** on this package — don't look for it in the Pinout view.
+
 For each pin below, click it on the chip diagram and pick the mode from the
 dropdown, matching `wiring.md`'s pin table:
 
 | Pin | Mode |
 |---|---|
-| PA0 | `TIM2_CH1` (from the Timers list, not GPIO) |
-| PA1 | `ADC1_IN2` (from the Analog list) |
-| PA2, PA3, PA4 | `GPIO_Input` |
-| PA5–PA11 | `GPIO_Output` |
-| PB0–PB4 | `GPIO_Output` |
+| PA1 | `ADC1_IN6` (from the Analog list) |
+| PA3, PA4, PA6 | `GPIO_Input` |
+| PA5 | `TIM2_CH1` (from the Timers list, not GPIO) |
+| PA7–PA12 | `GPIO_Output` |
+| PB0, PB1, PB4–PB7 | `GPIO_Output` |
 
 Then, in the **System Core → GPIO** left-side config panel:
-- For PA2/PA3/PA4: set **GPIO Pull-up/Pull-down** = `Pull-up`.
-- For PA5–PA11 and PB0–PB4: default push-pull output is fine; set **Maximum
-  output speed** = `Low` (these are just LEDs/segments, no need for fast
-  slew).
+- For PA3/PA4/PA6: set **GPIO Pull-up/Pull-down** = `Pull-up`.
+- For PA7–PA12 and PB0/PB1/PB4–PB7: default push-pull output is fine; set
+  **Maximum output speed** = `Low` (these are just LEDs/segments, no need
+  for fast slew).
 - Optional but recommended: rename the pin labels (right-click each pin →
   "Enter User Label") to `START_BTN`, `CRUISE_BTN`, `KILL_BTN`,
   `SEG_A`..`SEG_G`, `BUZZER`, `LED_GREEN`, `LED_RED`, `LED_YELLOW`,
@@ -74,7 +79,7 @@ Settings panel:
 
 ## 4. ADC1 config — throttle pot
 
-**Analog → ADC1**: IN2 enabled (should already be set from step 2).
+**Analog → ADC1**: IN6 enabled (should already be set from step 2).
 Resolution = 12-bit (default). Sampling time: default is fine for a
 potentiometer (slow-changing signal, no need to optimize).
 
