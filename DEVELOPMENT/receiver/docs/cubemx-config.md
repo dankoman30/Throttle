@@ -185,14 +185,44 @@ should appear in Project Explorer as `firmware`.
 ## 8. Add the shared source include paths
 
 Right-click the project in Project Explorer → **Properties → C/C++ General
-→ Paths and Symbols → Includes** (for both Debug and Release, or "All
-configurations"). Add two paths:
-- `${workspace_loc:/${ProjName}}/../../../../src/receiver`
-- `${workspace_loc:/${ProjName}}/../../../../src/common`
+→ Paths and Symbols → Includes**, with **Configuration: [All
+configurations]** selected at the top (so the change applies to both Debug
+and Release in one shot) and **"GNU C"** selected in the left-hand language
+tree (this list is per-language — adding while a different language, e.g.
+Assembler, is selected puts it somewhere `bench_app.c`'s C compile never
+sees; check **"Add to all languages"** in the Add dialog to sidestep this).
 
-(Adjust the number of `../` if your project ends up nested differently —
-count directory levels from `firmware/` back up to the repo root, then down
-into `src/receiver` and `src/common`.)
+The path from `firmware/` (the project root) back up to the repo root is
+exactly **3** levels (`firmware` → `receiver` → `DEVELOPMENT` →
+`Throttle`), not 4 — verify with `cd ../../../` from `firmware/` before
+trusting any different depth. Add two paths:
+- `${workspace_loc:/${ProjName}}/../../../src/receiver`
+- `${workspace_loc:/${ProjName}}/../../../src/common`
+
+**Type or paste this directly into the "Directory:" field** — do not use
+the "Workspace..." browse button (`src/receiver`/`src/common` are outside
+this project, so they won't appear there) or the "File system..." button
+if you want the portable `${workspace_loc:...}` form (File system... picks
+an absolute path instead, e.g. `C:\GitHub\Throttle\src\receiver`, which
+works too and is a reasonable fallback if the variable form gives trouble,
+but is tied to this one machine).
+
+**This exact combination of GUI actions is known to silently corrupt the
+value** — pasting into the Directory field while "Is a workspace path" is
+unchecked has been observed to prepend a stray `../Debug/../` (or just
+`../`) before the `${workspace_loc:...}` variable, producing something
+like `"../Debug/../${workspace_loc:/${ProjName}}/.../src/receiver"` that
+looks plausible in the UI but doesn't resolve correctly (you can't mix a
+literal relative prefix with a variable that resolves to an absolute path
+in one string). **After clicking Apply, verify what actually got written**
+by opening `firmware/.cproject` in a text editor and searching for
+`src/receiver` — the saved value should read exactly
+`&quot;${workspace_loc:/${ProjName}}/../../../src/receiver&quot;`, nothing
+extra before the `${`. If it doesn't match, delete the entry in the GUI and
+re-add it, or edit `.cproject` directly (with CubeIDE closed, to avoid it
+overwriting your edit on next save) — search for both
+`tool.c.compiler.option.includepaths` blocks (Debug and Release each have
+their own) and fix the `listOptionValue` entries there.
 
 This lets `bench_app.c`'s `#include "receiver_firmware.c"` and the shared
 `#include "throttle_protocol.h"` / `"crc8.h"` / `"battery_monitor.h"`
