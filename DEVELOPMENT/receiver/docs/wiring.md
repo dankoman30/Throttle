@@ -16,8 +16,8 @@ those three pins, which is a solid consistency check on the source.
 
 | Arduino label | STM32 pin | Arduino label | STM32 pin |
 |---|---|---|---|
-| A0 | PA0 | D0 | PA10 |
-| A1 | PA1 | D1 | PA9 |
+| A0 | PA0 | D0/RX | PA10 |
+| A1 | PA1 | D1/TX | PA9 |
 | A2 | PA3 | D2 | PA12 |
 | A3 | PA4 | D3 | PB0 |
 | A4 | PA5 | D4 | PB7 |
@@ -34,6 +34,11 @@ those three pins, which is a solid consistency check on the source.
 Plus `3V3`, `5V`, `VIN`, `GND` (both headers), `RESET` (both headers, tied
 to `NRST`), and `AREF`. **SWDIO/SWCLK (PA13/PA14) aren't on this header at
 all** — they're only on the separate ST-Link debug section.
+
+**`D0`/`D1` are silkscreened as `D0/RX` and `D1/TX`**, not bare `D0`/`D1` —
+they're the primary USART1 pins (PA10=RX, PA9=TX), common enough that ST
+prints both labels together. Look for the compound label, right next to
+`RST`/`GND` at the top of the left header.
 
 **Reserved/unavailable pins — do not wire anything to these, and don't
 reassign them in CubeMX either.** Verified against this board's own
@@ -100,8 +105,8 @@ doesn't go on the 3V3 rail, and the pot/display-common rail doesn't go to
 | Kill button | A5 | PA6 | in, internal pull-up | |
 | 7-seg segment a | A6 | PA7 | out | |
 | 7-seg segment b | D9 | PA8 | out | |
-| 7-seg segment c | D1 | PA9 | out | |
-| 7-seg segment d | D0 | PA10 | out | |
+| 7-seg segment c | D1/TX | PA9 | out | |
+| 7-seg segment d | D0/RX | PA10 | out | |
 | 7-seg segment e | D10 | PA11 | out | |
 | 7-seg segment f | D2 | PA12 | out | |
 | 7-seg segment g | D3 | PB0 | out | |
@@ -170,7 +175,7 @@ common-anode vs common-cathode isn't confirmed for this part:
 Wire the common pin to 3V3 (anode) or GND (cathode) accordingly, and put one
 resistor (~220–330Ω — check the datasheet's per-segment forward current,
 typically ~20mA max) in series with each of the 7 segment pins (a–g) to
-**A6, D9, D1, D0, D10, D2, D3** (per the pin table above). The decimal
+**A6, D9, D1/TX, D0/RX, D10, D2, D3** (per the pin table above). The decimal
 point (dp) segment is intentionally left unconnected — not needed for a
 0–9 readout.
 

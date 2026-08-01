@@ -30,7 +30,7 @@ Pin labels below are **Arduino header label (STM32 pin)** — see
    5V header ----------->|--------------------------------|---> [red: servo V+]
    GND -----------------> |--------------------------------|---> [brown: servo GND]
                         |                                |
-                        | A6,D9,D1,D0,D10,D2,D3          |
+                        | A6,D9,D1/TX,D0/RX,D10,D2,D3    |
                         | (7 x GPIO out, segs a..g) ----->|--[R]--[seg a..g]--+
                         |                                |                    |
                         |                                |     common --------+
