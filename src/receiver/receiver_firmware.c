@@ -20,6 +20,9 @@
 #include "throttle_protocol.h"
 #include "crc8.h"
 #include "battery_monitor.h"
+#ifdef USE_HAL_DRIVER
+#include "stm32l4xx_hal.h" /* HAL_GetTick() for millis() below */
+#endif
 
 typedef enum {
     STATE_IDLE_SAFE,   /* normal armed operation: throttle live, start allowed. Without a tach we
@@ -62,8 +65,11 @@ static const battery_profile_t RX_BATT = {
 };
 
 static uint32_t millis(void) {
-    // return HAL_GetTick();
-    return 0; /* placeholder */
+#ifdef USE_HAL_DRIVER
+    return HAL_GetTick();
+#else
+    return 0; /* placeholder: no HAL in the host-side compile-check build */
+#endif
 }
 
 static void set_servo_throttle(uint8_t value) {
