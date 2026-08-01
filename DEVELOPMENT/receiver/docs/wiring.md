@@ -72,9 +72,10 @@ Pull it off and set it aside.
 
 ## Power rails: 3V3 vs 5V vs VIN
 
-Use **3V3** for the breadboard's main power rail (pot, and the 7-segment
-common pin if it turns out to be common-anode) — it's the board's
-regulated 3.3V *output*, meant exactly for powering external components.
+Use **3V3** for the breadboard's main power rail (the pot) — it's the
+board's regulated 3.3V *output*, meant exactly for powering external
+components. (The 7-segment display's common pin goes to GND instead — it's
+confirmed common-cathode, see below.)
 
 **Don't use VIN for this.** VIN is a power *input* — where you'd connect an
 external battery/adapter if powering the board from something other than
@@ -158,30 +159,23 @@ which is enough for the state-transition beeps this rig uses. Swap to a
 
 ## 5611AH single-digit 7-segment display
 
-**Do a polarity test before wiring current-limiting resistors in** —
-common-anode vs common-cathode isn't confirmed for this part:
+**Confirmed common-cathode** per the manufacturer datasheet (XLITX
+5611AH, 0.56", ultra-bright red) — no polarity test needed. Wire the
+common pin to **GND**. `DISPLAY_COMMON_ANODE` in `firmware/Inc/bench_app.h`
+is already set to `0` (cathode) to match.
 
-1. Multimeter in diode-test mode (or a battery + one loose resistor as a
-   quick continuity/light test).
-2. Touch probes across the **common pin** (usually the middle pin on one
-   side, pin 3 or 8 on most 5611-family 10-pin single-digit packages — check
-   which two pins are tied together internally, that's the common) and one
-   segment pin.
-3. If the segment lights with the red (+) probe on the common pin → **common
-   cathode** (common ties to GND, segments driven HIGH through resistors).
-   If it lights with the black (−) probe on the common → **common anode**
-   (common ties to 3V3, segments driven LOW/sunk through resistors).
+Datasheet electro-optical specs relevant to the resistor choice:
+- Forward voltage (VF): 1.8V typical
+- Max continuous forward current per segment: 30mA (absolute max — stay
+  well under this)
 
-Wire the common pin to 3V3 (anode) or GND (cathode) accordingly, and put one
-resistor (~220–330Ω — check the datasheet's per-segment forward current,
-typically ~20mA max) in series with each of the 7 segment pins (a–g) to
-**A6, D9, D1/TX, D0/RX, D10, D2, D3** (per the pin table above). The decimal
-point (dp) segment is intentionally left unconnected — not needed for a
-0–9 readout.
-
-Once you know which polarity you have, set `DISPLAY_COMMON_ANODE` in
-`firmware/Inc/bench_app.h` to `1` (anode) or `0` (cathode) — the
-firmware inverts its segment-drive logic based on that one `#define`.
+At the STM32's 3.3V GPIO drive: `R = (3.3V − 1.8V) / I = 1.5V / I`. A
+**150–220Ω** resistor gives ~7–10mA per segment — comfortably under both
+the LED's 30mA max and a typical GPIO's ~20mA safe drive limit, while
+still bright enough for bench use. Put one resistor per segment pin (a–g)
+in series, to **A6, D9, D1/TX, D0/RX, D10, D2, D3** (per the pin table
+above). The decimal point (dp) segment is intentionally left
+unconnected — not needed for a 0–9 readout.
 
 ## LEDs (green / red / yellow / heartbeat)
 

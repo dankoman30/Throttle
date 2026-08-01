@@ -32,7 +32,7 @@ servo are wired up.
 
 ```
 docs/
-  wiring.md           pin-by-pin connections, resistor values, 7-seg polarity test
+  wiring.md           pin-by-pin connections and resistor values
   cubemx-config.md    step-by-step CubeMX peripheral/pin/clock setup
   bench-behavior.md   full behavior spec + verification checklist
 schematics/

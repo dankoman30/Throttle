@@ -3,10 +3,10 @@
 #ifndef BENCH_APP_H
 #define BENCH_APP_H
 
-/* Set from the polarity test in DEVELOPMENT/receiver/docs/wiring.md:
- *   1 = common anode   (common pin -> 3V3, segments driven LOW to light)
- *   0 = common cathode (common pin -> GND, segments driven HIGH to light)
- * Unconfirmed for the 5611AH on hand - verify before trusting the display. */
+/* 1 = common anode   (common pin -> 3V3, segments driven LOW to light)
+ * 0 = common cathode (common pin -> GND, segments driven HIGH to light)
+ * The 5611AH on hand is common-cathode per its datasheet - confirmed, no
+ * polarity test needed (see DEVELOPMENT/receiver/docs/wiring.md). */
 #define DISPLAY_COMMON_ANODE   0
 
 /* Call once from main()'s USER CODE BEGIN 2, after all MX_*_Init() calls. */

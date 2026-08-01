@@ -3,7 +3,7 @@
 No KiCad files yet (see `hardware/README.md` — that's where real schematics
 will eventually live under CERN-OHL-S). This is a breadboard-level diagram
 for the bench rig only, sufficient to wire it up; see `../docs/wiring.md`
-for exact pin names, resistor values, and the 7-segment polarity test.
+for exact pin names and resistor values.
 
 ## Block diagram
 
@@ -34,8 +34,8 @@ Pin labels below are **Arduino header label (STM32 pin)** — see
                         | (7 x GPIO out, segs a..g) ----->|--[R]--[seg a..g]--+
                         |                                |                    |
                         |                                |     common --------+
-                        |                                |     (3V3 if anode,
-                        |                                |      GND if cathode)
+                        |                                |     (GND - confirmed
+                        |                                |      common-cathode)
                         |                                |
                         | D6   (PB1,  GPIO out) --------->|--[piezo buzzer]--GND
                         | D12  (PB4,  GPIO out) --------->|--[R]--[LED green]--GND
