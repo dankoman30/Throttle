@@ -7,7 +7,7 @@ Every interesting function in `src/receiver/receiver_firmware.c`
 `crank_tick`, `step_toward_target`) and every state global (`g_state`,
 `g_target_throttle`, `g_current_servo_throttle`,
 `g_starter_cooldown_until_ms`, ...) is declared `static` — internal linkage,
-file-scope only. `bench_app.c` (`DEVELOPMENT/receiver/firmware/Core/Src/`)
+file-scope only. `bench_app.c` (`DEVELOPMENT/receiver/firmware/Src/`)
 textually pulls the whole file in with `#include "receiver_firmware.c"`,
 putting all of that into the same translation unit. That means the bench
 rig calls the *actual* safety state machine, not a reimplementation — any

@@ -14,7 +14,7 @@ servo are wired up.
   its stickiness, gated start (manual crank model), rate-limited throttle,
   and the independent loss-of-signal watchdog — all running the actual
   functions from `src/receiver/receiver_firmware.c` via
-  `#include "receiver_firmware.c"` in `firmware/Core/Src/bench_app.c` (see
+  `#include "receiver_firmware.c"` in `firmware/Src/bench_app.c` (see
   `docs/bench-behavior.md` for why this reuse approach was chosen and
   exactly what runs).
 - A hand-built cruise mirror (small, bench-only reimplementation of the
@@ -38,14 +38,14 @@ docs/
 schematics/
   receiver-bench.md   breadboard schematic (markdown/ASCII)
 firmware/
-  Core/Src/bench_app.c   ingestion (buttons/pot) + actuation (servo/display/buzzer/LEDs)
-  Core/Inc/bench_app.h
+  Src/bench_app.c        ingestion (buttons/pot) + actuation (servo/display/buzzer/LEDs)
+  Inc/bench_app.h
 ```
 
-`firmware/` is not yet an importable CubeIDE project — only the application
-source is committed here. See `docs/cubemx-config.md` for creating the
-project (via the CubeIDE wizard, board = NUCLEO-L432KC) directly at this
-path and wiring `bench_app.c` in.
+`firmware/` is a full STM32CubeMX-generated project (HAL/CMSIS drivers under
+`Drivers/`, `firmware.ioc`, `.project`/`.cproject`) targeting the
+NUCLEO-L432KC, with `bench_app.c`/`bench_app.h` wired into `main.c`. See
+`docs/cubemx-config.md` for how it was configured and how to regenerate it.
 
 ## Bill of materials (this bench rig)
 

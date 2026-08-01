@@ -106,7 +106,7 @@ PA7–PA12 and PB0 (per the pin table above). The decimal point (dp) segment
 is intentionally left unconnected — not needed for a 0–9 readout.
 
 Once you know which polarity you have, set `DISPLAY_COMMON_ANODE` in
-`firmware/Core/Inc/bench_app.h` to `1` (anode) or `0` (cathode) — the
+`firmware/Inc/bench_app.h` to `1` (anode) or `0` (cathode) — the
 firmware inverts its segment-drive logic based on that one `#define`.
 
 ## LEDs (green / red / yellow / heartbeat)

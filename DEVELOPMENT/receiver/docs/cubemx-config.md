@@ -36,58 +36,109 @@ this board (ST-Link SWD, VCP UART, on-board LED, MCO clock-in — see
 `wiring.md`). Leave them at whatever CubeMX defaults to. Also note **PB2
 doesn't exist** on this package — don't look for it in the Pinout view.
 
-For each pin below, click it on the chip diagram and pick the mode from the
-dropdown, matching `wiring.md`'s pin table:
+Click each pin on the chip diagram, pick its mode from the dropdown that
+pops up, then look at the **configuration panel** below/beside the diagram
+(clicking a pin switches that panel's context to it) — it has the mode
+dropdowns plus a **User Label** text field, all for that one pin. Set every
+column below for each pin (`—` means that field doesn't apply/isn't shown
+for that pin's mode). `bench_app.c` refers to pins by these labels
+(`KILL_BTN_Pin`/`KILL_BTN_GPIO_Port`, etc.), not raw pin numbers, so the
+label text must match exactly (case-sensitive):
 
-| Pin | Mode |
-|---|---|
-| PA1 | `ADC1_IN6` (from the Analog list) |
-| PA3, PA4, PA6 | `GPIO_Input` |
-| PA5 | `TIM2_CH1` (from the Timers list, not GPIO) |
-| PA7–PA12 | `GPIO_Output` |
-| PB0, PB1, PB4–PB7 | `GPIO_Output` |
+| Pin | Mode | Pull-up/Pull-down | Max output speed | GPIO output level | User Label |
+|---|---|---|---|---|---|
+| PA1 | `ADC1_IN6` (Analog list) | — | — | — | *(none — code uses the ADC handle)* |
+| PA3 | `GPIO_Input` | `Pull-up` | — | — | `START_BTN` |
+| PA4 | `GPIO_Input` | `Pull-up` | — | — | `CRUISE_BTN` |
+| PA5 | `TIM2_CH1` (Timers list, not GPIO) | — | — | — | *(none — code uses the timer handle)* |
+| PA6 | `GPIO_Input` | `Pull-up` | — | — | `KILL_BTN` |
+| PA7 | `GPIO_Output` | — | `Low` | `Low` | `SEG_A` |
+| PA8 | `GPIO_Output` | — | `Low` | `Low` | `SEG_B` |
+| PA9 | `GPIO_Output` | — | `Low` | `Low` | `SEG_C` |
+| PA10 | `GPIO_Output` | — | `Low` | `Low` | `SEG_D` |
+| PA11 | `GPIO_Output` | — | `Low` | `Low` | `SEG_E` |
+| PA12 | `GPIO_Output` | — | `Low` | `Low` | `SEG_F` |
+| PB0 | `GPIO_Output` | — | `Low` | `Low` | `SEG_G` |
+| PB1 | `GPIO_Output` | — | `Low` | `Low` | `BUZZER` |
+| PB4 | `GPIO_Output` | — | `Low` | `Low` | `LED_GREEN` |
+| PB5 | `GPIO_Output` | — | `Low` | `Low` | `LED_RED` |
+| PB6 | `GPIO_Output` | — | `Low` | `Low` | `LED_YELLOW` |
+| PB7 | `GPIO_Output` | — | `Low` | `Low` | `LED_HEARTBEAT` |
 
-Then, in the **System Core → GPIO** left-side config panel:
-- For PA3/PA4/PA6: set **GPIO Pull-up/Pull-down** = `Pull-up`.
-- For PA7–PA12 and PB0/PB1/PB4–PB7: default push-pull output is fine; set
-  **Maximum output speed** = `Low` (these are just LEDs/segments, no need
-  for fast slew).
-- Optional but recommended: rename the pin labels (right-click each pin →
-  "Enter User Label") to `START_BTN`, `CRUISE_BTN`, `KILL_BTN`,
-  `SEG_A`..`SEG_G`, `BUZZER`, `LED_GREEN`, `LED_RED`, `LED_YELLOW`,
-  `LED_HEARTBEAT`, `SERVO_PWM` — this makes the generated `main.h` define
-  readable macros like `KILL_BTN_Pin`/`KILL_BTN_GPIO_Port` instead of raw
-  `GPIO_PIN_4`, which `bench_app.c` uses.
+Notes on the output columns: **Max output speed** = `Low` is plenty for
+LEDs/segments (no fast switching needed) — leave **GPIO mode** at its
+default `Output Push Pull` (don't switch to Open Drain). **GPIO output
+level** = `Low` just sets the pin's state for the brief window between
+reset and `bench_app_init()` running — `bench_app_init()` immediately
+drives the buzzer/LEDs off and the display to `0` anyway, so this default
+doesn't have to be exact, `Low` just avoids anything flashing on briefly at
+power-up.
 
 ## 3. Timer (TIM2) config — servo PWM
 
-**Timers → TIM2**: Channel1 = `PWM Generation CH1`. In the Parameter
-Settings panel:
-- Prescaler and Period need to produce a 50Hz (20ms) period with enough
-  resolution for pulse widths in the ~1–2ms range. With the default 80MHz
-  SYSCLK (check **Clock Configuration** tab — L432 typically defaults to a
-  lower HSI-derived clock unless you raise it; either is fine as long as
-  prescaler/period are computed from the *actual* TIM2 clock shown there):
-  pick **Prescaler = (TIM2_CLK / 1,000,000) − 1** so the timer counts in
-  microseconds, and **Period (ARR) = 19999** (20,000 counts = 20ms). Then a
-  servo pulse width in microseconds is just the CCR1 compare value
-  (`__HAL_TIM_SET_COMPARE`) — e.g. 1500 = 1.5ms = center, matching what
-  `bench_app.c` expects. `bench_app.c` computes the compare value directly
-  in microseconds (`SERVO_PULSE_MIN_US`/`MAX_US`, 1000–2000), so as long as
-  the prescaler/period above really do give 1 count = 1µs, no extra
-  clock-matching constant is needed on the code side.
+**Before this section**, check the **Clock Configuration** tab and find the
+**APB1 timer clocks (MHz)** box in the clock tree (this is TIM2's clock
+source) — on a freshly-generated NUCLEO-L432KC project this is **32 MHz**.
+If you changed the clock config, re-derive the Prescaler below from
+whatever that box actually shows: **Prescaler = (APB1 timer clock in Hz /
+1,000,000) − 1**, so the timer counts in whole microseconds. At 32MHz that's
+`32,000,000 / 1,000,000 − 1 = 31`.
+
+**Timers → TIM2**, Channel1 = `PWM Generation CH1`. In the **Parameter
+Settings** panel (top-level, not the PWM sub-section yet):
+- **Prescaler**: `31`
+- **Counter Mode**: `Up` (default, leave as-is)
+- **Counter Period (Auto-reload register)**: `19999` — change this from the
+  default `4294967295`; this is the field that actually sets the 20ms (50Hz)
+  period (20,000 counts × 1µs).
+
+Then scroll to the **PWM Generation Channel 1** sub-section (a separate
+block further down, not the same as the settings above):
+- **Pulse**: `1500` (1.5ms = servo center — just a sane boot-time default;
+  `bench_app.c` overwrites the compare value every tick via
+  `__HAL_TIM_SET_COMPARE`, computing it directly in microseconds via
+  `SERVO_PULSE_MIN_US`/`MAX_US`, 1000–2000, so this only matters for the
+  brief window before `bench_app_init()` runs)
+- **CH Polarity**: `High` (default, leave as-is)
+
+Everything else on this screen (One Pulse Mode, Auto-reload preload,
+trigger/slave-mode settings) — leave at default, none of it matters for a
+plain continuous PWM output like this.
 
 ## 4. ADC1 config — throttle pot
 
-**Analog → ADC1**: IN6 enabled (should already be set from step 2).
+**Analog → ADC1** → in the "ADC1 Mode and Configuration" panel, find the
+**IN6** channel dropdown and set it to **"IN6 Single-ended"** (not
+"Differential" — that's for measuring a voltage difference between two
+channel pairs, not a plain potentiometer wiper against GND; "Disable" is
+just the unset default). Selecting `ADC1_IN6` as PA1's mode back in step 2
+only routes the pin to the ADC peripheral — this channel-mode dropdown is a
+separate, explicit setting.
+
 Resolution = 12-bit (default). Sampling time: default is fine for a
 potentiometer (slow-changing signal, no need to optimize).
 
 ## 5. Clock configuration
 
-Defaults are fine — don't need to max out SYSCLK for this bench rig. Just
-note whatever TIM2 clock CubeMX shows after generation (step 3), since
-that's the number the TIM2 prescaler in step 3 is computed from.
+Defaults are fine — don't need to max out SYSCLK for this bench rig. On a
+freshly board-selected NUCLEO-L432KC project with default peripherals
+initialized, SYSCLK/AHB/APB1/APB2 all come up at **32MHz** (all prescalers
+`/1`), which makes **APB1 Timer clocks = 32MHz** — the number step 3's TIM2
+Prescaler (`31`) is computed from. If yours differs, re-derive that
+Prescaler value before moving on.
+
+**You'll likely hit a clock warning around here** — either when opening
+this tab for the first time after enabling ADC1, or when clicking
+**GENERATE CODE** in step 6: *"These peripherals still have some not
+configured or wrong parameter values: [Clock]"*, and/or a popup asking *"Do
+you want to run automatic clock issues solver?"*. This is an invalid
+multiplier left over in the **PLLSAI1** branch (feeds the ADC/SAI1/I2C3
+clock muxes — shown as a magenta-highlighted field in that part of the
+tree), not the main SYSCLK→AHB→APB1/APB2 chain TIM2 depends on. Click
+**Yes** to run the automatic solver, then confirm **APB1 Timer clocks
+(MHz)** still reads the same value it did before (32, unless you changed
+something) — if it didn't move, the fix only touched the ADC-clock branch
+and step 3's Prescaler is still valid.
 
 ## 6. Project Manager view → Generate Code
 
@@ -109,15 +160,19 @@ The Project Manager view has 3 tabs: **Project**, **Code Generation**,
    assumes throughout).
 2. **Code Generation** tab: check **"Generate peripheral initialization as
    a pair of .c/.h files"** (the alternative is folding everything into
-   `main.c`). This is what makes CubeMX emit separate `Core/Inc/adc.h` and
-   `Core/Inc/tim.h` (declaring `extern ADC_HandleTypeDef hadc1;` and
+   `main.c`). This is what makes CubeMX emit separate `Inc/adc.h` and
+   `Inc/tim.h` (declaring `extern ADC_HandleTypeDef hadc1;` and
    `extern TIM_HandleTypeDef htim2;`) — `bench_app.c` includes `"adc.h"`
    and `"tim.h"` directly and needs them to exist as separate files.
-3. Click **GENERATE CODE** (bottom right). This produces `Core/Src/main.c`,
-   `Core/Inc/main.h`, `Core/Src/adc.c` + `Core/Inc/adc.h`, `Core/Src/tim.c` +
-   `Core/Inc/tim.h`, the HAL/CMSIS driver tree under `Drivers/`, the `.ioc`
-   file, and a ready `.project`/`.cproject` pair — all under
-   `DEVELOPMENT/receiver/firmware/`.
+3. Click **GENERATE CODE** (bottom right). This produces `Src/main.c`,
+   `Inc/main.h`, `Src/adc.c` + `Inc/adc.h`, `Src/tim.c` + `Inc/tim.h`, the
+   HAL/CMSIS driver tree under `Drivers/`, the `.ioc` file, and a ready
+   `.project`/`.cproject` pair — all under `DEVELOPMENT/receiver/firmware/`.
+   **Note:** with Application structure = `Basic`, CubeMX generates flat
+   `Src/`/`Inc/` folders at the project root — *not* the `Core/Src`/
+   `Core/Inc` layout some CubeIDE tutorials show (that's what `Advanced`
+   structure or CubeIDE's own native project wizard produce instead). This
+   doc's paths below assume the flat `Src/`/`Inc/` layout.
 
 ## 7. Open the project in STM32CubeIDE
 
@@ -145,19 +200,24 @@ resolve without copying any files into the CubeIDE project.
 
 ## 9. Copy in the bench app source
 
-`bench_app.c`/`bench_app.h` were cleared out of `firmware/` earlier to give
-CubeMX/CubeIDE an empty target directory — they still exist in this repo's
-git history (see the `Add receiver bench-test rig` commit). Restore them
-into the freshly generated tree:
-- `bench_app.c` → `Core/Src/bench_app.c`
-- `bench_app.h` → `Core/Inc/bench_app.h`
+*(Already done as of this doc's last update — `Src/bench_app.c` and
+`Inc/bench_app.h` are committed in this repo alongside the generated
+project. This step is here for reference/regeneration only.)*
+
+`bench_app.c`/`bench_app.h` live in this repo's git history if they're ever
+missing from a fresh checkout (see the `Add receiver bench-test rig`
+commit) — restore them into the generated tree:
+- `bench_app.c` → `Src/bench_app.c`
+- `bench_app.h` → `Inc/bench_app.h`
 
 CubeMX's "Generate Code" only touches its own generated files, so these two
 are safe from being overwritten by future regenerations.
 
 ## 10. Wire the entry point into `main.c`
 
-Open the generated `Core/Src/main.c`. Inside the `/* USER CODE BEGIN
+*(Also already done — noted here for reference/regeneration only.)*
+
+Open the generated `Src/main.c`. Inside the `/* USER CODE BEGIN
 Includes */` block add:
 ```c
 #include "bench_app.h"
