@@ -7,46 +7,56 @@ for exact pin names, resistor values, and the 7-segment polarity test.
 
 ## Block diagram
 
+Pin labels below are **Arduino header label (STM32 pin)** — see
+`../docs/wiring.md` for the full translation table.
+
 ```
                         +-------------------------------+
                         |     STM32L432KC Nucleo-32      |
                         |                                |
-   B103 pot ----------->| PA1  (ADC1_IN6)                |
+   B103 pot ----------->| A1   (PA1, ADC1_IN6)           |
    (wiper; ends to       |                                |
     3V3 / GND)           |                                |
                         |                                |
-   Start button -------->| PA3  (GPIO in, pull-up)        |
+   Start button -------->| A2   (PA3, GPIO in, pull-up)   |
    (other leg -> GND)    |                                |
-   Cruise button ------->| PA4  (GPIO in, pull-up)        |
+   Cruise button ------->| A3   (PA4, GPIO in, pull-up)   |
    (other leg -> GND)    |                                |
-   Kill button --------->| PA6  (GPIO in, pull-up)        |
+   Kill button --------->| A5   (PA6, GPIO in, pull-up)   |
    (other leg -> GND)    |                                |
                         |                                |
-                        | PA5  (TIM2_CH1, PWM) ---------->|--[servo signal]
+                        | A4   (PA5, TIM2_CH1, PWM) ----->|--[servo signal]
                         |                                |     SG90 servo
    5V header ----------->|--------------------------------|---> [servo V+]
    GND -----------------> |--------------------------------|---> [servo GND]
                         |                                |
-                        | PA7..PA12, PB0 (7 x GPIO out) -->|--[R]--[seg a..g]--+
+                        | A6,D9,D1,D0,D10,D2,D3          |
+                        | (7 x GPIO out, segs a..g) ----->|--[R]--[seg a..g]--+
                         |                                |                    |
                         |                                |     common --------+
                         |                                |     (3V3 if anode,
                         |                                |      GND if cathode)
                         |                                |
-                        | PB1  (GPIO out) --------------->|--[piezo buzzer]--GND
-                        | PB4  (GPIO out) --------------->|--[R]--[LED green]--GND
-                        | PB5  (GPIO out) --------------->|--[R]--[LED red]----GND
-                        | PB6  (GPIO out) --------------->|--[R]--[LED yellow]-GND
-                        | PB7  (GPIO out) --------------->|--[R]--[LED heartbeat]-GND
+                        | D6   (PB1,  GPIO out) --------->|--[piezo buzzer]--GND
+                        | D12  (PB4,  GPIO out) --------->|--[R]--[LED green]--GND
+                        | D11  (PB5,  GPIO out) --------->|--[R]--[LED red]----GND
+                        | D5   (PB6,  GPIO out) --------->|--[R]--[LED yellow]-GND
+                        | D4   (PB7,  GPIO out) --------->|--[R]--[LED heartbeat]-GND
                         |                                |
                         | GND ---------------------------- common ground rail
                         +-------------------------------+
 ```
 
+**Remove the factory spare jumper cap between GND and D2 first** — it's
+not functional, just a parking spot ST ships a spare clip in, but D2
+(PA12) is segment f here and the jumper would short it to ground. See
+`../docs/wiring.md`.
+
 **Deliberately unused** (reserved by the board — see `../docs/wiring.md`):
-PA0 (board-locked MCO/clock-in), PA2 (ST-Link VCP_TX), PA13/PA14 (SWD),
-PA15 (ST-Link VCP_RX), PB3 (on-board green LED, LD3). PB2 doesn't exist on
-this package at all.
+A0/PA0 (board-locked MCO/clock-in), A7/PA2 (ST-Link VCP_TX), PA13/PA14
+(SWD, not on this header), PA15 (ST-Link VCP_RX, not on this header),
+D13/PB3 (on-board green LED, LD3), D7/D8 (PC14/PC15, crystal). PB2 doesn't
+exist on this package at all and has no Arduino label.
 
 `[R]` = one current-limiting resistor per segment/LED (~220–330Ω, see
 `../docs/wiring.md`). All GND connections (buttons, pot, display common if
