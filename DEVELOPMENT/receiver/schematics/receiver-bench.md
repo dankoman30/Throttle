@@ -85,3 +85,11 @@ Route the SG90's V+ from the Nucleo's `5V` header pin (USB-derived), not
 `3V3`. If the board resets when the servo moves under load, switch the
 servo to a separate 5V supply and keep grounds common — see
 `../docs/wiring.md`.
+
+## Power rail note
+
+The pot/display-common rail is `3V3`, not `VIN` (VIN is a power *input* for
+an external battery/adapter, not a usable output while running on USB) and
+not `5V` (the pot feeds the ADC directly, which is only rated to ~3.3V) —
+see "Power rails: 3V3 vs 5V vs VIN" in `../docs/wiring.md` for the full
+reasoning.

@@ -65,6 +65,30 @@ board). Since `D2`/`PA12` is **7-segment segment f** in this pin plan,
 leaving the jumper in place would permanently short that GPIO to ground.
 Pull it off and set it aside.
 
+## Power rails: 3V3 vs 5V vs VIN
+
+Use **3V3** for the breadboard's main power rail (pot, and the 7-segment
+common pin if it turns out to be common-anode) — it's the board's
+regulated 3.3V *output*, meant exactly for powering external components.
+
+**Don't use VIN for this.** VIN is a power *input* — where you'd connect an
+external battery/adapter if powering the board from something other than
+USB. Since this rig is powered over USB/ST-Link, VIN is just unconnected;
+wiring a rail to it gets you nothing.
+
+This isn't just about convenience: the pot feeds directly into the STM32's
+ADC (`A1`/`PA1`, `ADC1_IN6`), and the ADC input range is tied to the chip's
+own supply (VDDA ≈ 3.3V). If that rail were somehow at 5V instead, the
+wiper could swing above 3.3V and overdrive the ADC pin beyond spec — a real
+risk to the MCU, not just a bad reading. 3V3 is the only rail that's safe
+to feed into that pin.
+
+The **servo is the one exception** — it gets its own separate connection
+from the **5V** pin straight to its power lead (see the SG90 section
+below), not the same 3V3 rail as the pot. Don't cross the two: servo power
+doesn't go on the 3V3 rail, and the pot/display-common rail doesn't go to
+5V.
+
 ## Pin table
 
 | Function | Arduino label | STM32 pin | Direction | Notes |
