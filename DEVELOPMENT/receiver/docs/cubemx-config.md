@@ -1,46 +1,35 @@
 # CubeMX / CubeIDE project setup — receiver bench rig
 
-You have STM32CubeIDE 2.2.0 installed and an empty workspace. This walks
-through creating the project and wiring in `bench_app.c`. Written for someone
-coming from Arduino — CubeMX's job is just "pick a pin, pick a mode," it's
-not doing anything conceptually different from `pinMode()`.
+You have STM32CubeIDE 2.2.0 and (separately) STM32CubeMX 6.18.1 installed,
+plus an empty CubeIDE workspace. This walks through configuring the board in
+CubeMX, generating a CubeIDE-ready project from it, and wiring in
+`bench_app.c`. Written for someone coming from Arduino — CubeMX's job is
+just "pick a pin, pick a mode," it's not doing anything conceptually
+different from `pinMode()`.
 
-## 1. Create the project
+**Why two separate tools:** newer STM32CubeIDE releases (this install
+included) dropped the built-in CubeMX/Device Configuration Tool integration
+— confirmed from this install's own bundled release notes (UM2609/UM2553,
+`C:\ST\STM32CubeIDE_2.2.0\STM32CubeIDE\plugins\com.st.stm32cube.ide.documentation_*\docs\`)
+and from a link inside CubeIDE's own Information Center pointing at the
+standalone STM32CubeMX download. So: CubeMX (standalone) does the board/pin/
+peripheral configuration and generates the project; CubeIDE just opens what
+it generated. (STM32CubeMX2, the newer tool ST also lists for download, is
+scoped to the STM32C5 series only as of v1.1.1 — irrelevant here, the L432KC
+needs plain STM32CubeMX.)
 
-This install's menu wording differs from older STM32CubeIDE tutorials/docs
-you may find online — confirmed against the release notes and user guide
-(UM2553, UM2609) bundled with this exact install
-(`C:\ST\STM32CubeIDE_2.2.0\STM32CubeIDE\plugins\com.st.stm32cube.ide.documentation_*\docs\`).
+## 1. Configure the board in STM32CubeMX
 
-1. **File → STM32 Project Create/Import → Create New STM32 Project**.
-2. A popup offers 4 tiles: "STM32CubeIDE empty project", "C Project", "C++
-   Project", "STM32 CMake project". Pick **STM32CubeIDE empty project** —
-   despite the name, this is the STM32Cube/HAL-integrated one with MCU/board
-   selection and the CubeMX peripheral-configuration tool (the plain "C
-   Project"/"C++ Project" tiles are generic Eclipse CDT with no STM32
-   integration at all; "STM32 CMake project" does the same MCU/board
-   selection but builds via CMake instead of CubeIDE's default managed
-   makefile — not what these docs assume).
-3. **Board Selector** tab (not "MCU/MPU Selector" — picking the board
+1. Launch STM32CubeMX → **File → New Project** (or the "ACCESS TO BOARD
+   SELECTOR" tile on the home screen).
+2. **Board Selector** tab (not "MCU/MPU Selector" — picking the board
    pre-selects the right pins for the ST-Link, USB, and the on-board LED so
-   you don't have to know them) → search `NUCLEO-L432KC` → select it → Next.
-4. Project name: `bench_app` (or similar). **Location**: uncheck "use
-   default location" and point it at
-   `C:\GitHub\Throttle\DEVELOPMENT\receiver\firmware` directly, so the
-   generated project lands in the repo instead of the CubeIDE workspace
-   folder. **The target directory must be completely empty** — the wizard
-   refuses a non-empty one. If `bench_app.c`/`bench_app.h` are already
-   sitting in there from a previous step, move them out temporarily, create
-   the project into the now-empty folder, then move them into the
-   generated `Core/Src`/`Core/Inc` afterward (step 8 below).
-5. Targeted Language: **C**. Targeted Binary Type: leave the preselected
-   **Executable** (not "Static library" — that produces a `.a` meant to be
-   linked into another project, not a standalone flashable image). Finish.
-   Say **Yes** if it asks to initialize all peripherals with their default
-   mode (harmless, we'll override what we need) and **Yes** to open the
-   Device Configuration Tool (the `.ioc` pinout view).
+   you don't have to know them) → search `NUCLEO-L432KC` → select it →
+   Next/OK.
+3. If asked to initialize all peripherals with their default mode, **Yes**
+   is fine (harmless, we override what we need below).
 
-## 2. Pin configuration (Device Configuration Tool → Pinout & Configuration)
+## 2. Pin configuration (Pinout & Configuration tab)
 
 For each pin below, click it on the chip diagram and pick the mode from the
 dropdown, matching `wiring.md`'s pin table:
@@ -78,10 +67,10 @@ Settings panel:
   microseconds, and **Period (ARR) = 19999** (20,000 counts = 20ms). Then a
   servo pulse width in microseconds is just the CCR1 compare value
   (`__HAL_TIM_SET_COMPARE`) — e.g. 1500 = 1.5ms = center, matching what
-  `bench_app.c` expects.
-- Note the actual TIM2 clock CubeMX reports after setting this, since
-  `bench_app.c` has a `SERVO_TIM_CLK_HZ` constant at the top you'll need to
-  match to it.
+  `bench_app.c` expects. `bench_app.c` computes the compare value directly
+  in microseconds (`SERVO_PULSE_MIN_US`/`MAX_US`, 1000–2000), so as long as
+  the prescaler/period above really do give 1 count = 1µs, no extra
+  clock-matching constant is needed on the code side.
 
 ## 4. ADC1 config — throttle pot
 
@@ -92,16 +81,48 @@ potentiometer (slow-changing signal, no need to optimize).
 ## 5. Clock configuration
 
 Defaults are fine — don't need to max out SYSCLK for this bench rig. Just
-note whatever TIM2 clock CubeMX shows after generation (step 3).
+note whatever TIM2 clock CubeMX shows after generation (step 3), since
+that's the number the TIM2 prescaler in step 3 is computed from.
 
-## 6. Generate code
+## 6. Project Manager view → Generate Code
 
-**Project → Generate Code** (or the gear-with-gears toolbar icon). This
-creates `Core/Src/main.c`, `Core/Inc/main.h`, the HAL/CMSIS driver tree, and
-the `.ioc` file, all under
-`DEVELOPMENT/receiver/firmware/`.
+The Project Manager view has 3 tabs: **Project**, **Code Generation**,
+**Advanced Settings**.
 
-## 7. Add the shared source include paths
+1. **Project** tab: **Project Name**: `firmware`. **Project Location**:
+   point at `C:\GitHub\Throttle\DEVELOPMENT\receiver` (CubeMX appends the
+   project name as a subfolder of Location, so `Location=...\receiver` +
+   `Name=firmware` generates into `...\receiver\firmware\`, which is where
+   this repo's `bench_app.c`/`bench_app.h` and the rest of this doc expect
+   the project to live). **Application structure**: leave `Basic` (this
+   project uses no middleware). **Toolchain/IDE**: `STM32CubeIDE`. Once
+   that's selected, an extra **"Generate under root"** checkbox appears —
+   **check it**, so the `.project`/`.cproject` land directly in
+   `firmware\` instead of a nested toolchain subfolder (unchecked, CubeMX
+   puts them under a separate `STM32CubeIDE\` subfolder, which would break
+   the relative include paths in step 8 below and the location this doc
+   assumes throughout).
+2. **Code Generation** tab: check **"Generate peripheral initialization as
+   a pair of .c/.h files"** (the alternative is folding everything into
+   `main.c`). This is what makes CubeMX emit separate `Core/Inc/adc.h` and
+   `Core/Inc/tim.h` (declaring `extern ADC_HandleTypeDef hadc1;` and
+   `extern TIM_HandleTypeDef htim2;`) — `bench_app.c` includes `"adc.h"`
+   and `"tim.h"` directly and needs them to exist as separate files.
+3. Click **GENERATE CODE** (bottom right). This produces `Core/Src/main.c`,
+   `Core/Inc/main.h`, `Core/Src/adc.c` + `Core/Inc/adc.h`, `Core/Src/tim.c` +
+   `Core/Inc/tim.h`, the HAL/CMSIS driver tree under `Drivers/`, the `.ioc`
+   file, and a ready `.project`/`.cproject` pair — all under
+   `DEVELOPMENT/receiver/firmware/`.
+
+## 7. Open the project in STM32CubeIDE
+
+CubeMX generating with Toolchain=STM32CubeIDE produces a project CubeIDE
+can open directly — it does not need re-importing through any special
+wizard. In CubeIDE: **File → Open Projects from File System...** → Import
+source: `C:\GitHub\Throttle\DEVELOPMENT\receiver\firmware` → Finish. It
+should appear in Project Explorer as `firmware`.
+
+## 8. Add the shared source include paths
 
 Right-click the project in Project Explorer → **Properties → C/C++ General
 → Paths and Symbols → Includes** (for both Debug and Release, or "All
@@ -117,16 +138,19 @@ This lets `bench_app.c`'s `#include "receiver_firmware.c"` and the shared
 `#include "throttle_protocol.h"` / `"crc8.h"` / `"battery_monitor.h"`
 resolve without copying any files into the CubeIDE project.
 
-## 8. Copy in the bench app source
+## 9. Copy in the bench app source
 
-Copy the committed `Core/Src/bench_app.c` and `Core/Inc/bench_app.h` from
-this repo's `DEVELOPMENT/receiver/firmware/` into the same paths inside the
-CubeIDE-generated project (they may already be there if you generated
-directly into this folder — just don't let CubeMX's "Generate Code" step
-overwrite them; it only touches its own generated files, not new ones you
-add).
+`bench_app.c`/`bench_app.h` were cleared out of `firmware/` earlier to give
+CubeMX/CubeIDE an empty target directory — they still exist in this repo's
+git history (see the `Add receiver bench-test rig` commit). Restore them
+into the freshly generated tree:
+- `bench_app.c` → `Core/Src/bench_app.c`
+- `bench_app.h` → `Core/Inc/bench_app.h`
 
-## 9. Wire the entry point into `main.c`
+CubeMX's "Generate Code" only touches its own generated files, so these two
+are safe from being overwritten by future regenerations.
+
+## 10. Wire the entry point into `main.c`
 
 Open the generated `Core/Src/main.c`. Inside the `/* USER CODE BEGIN
 Includes */` block add:
@@ -145,7 +169,7 @@ bench_app_tick();
 These markers are preserved across future CubeMX regenerations (e.g. if you
 add a peripheral later), so your edits won't be lost.
 
-## 10. Build and flash
+## 11. Build and flash
 
 Hammer icon to build. Then **Run → Debug** (or the bug icon) — CubeIDE talks
 to the on-board ST-Link automatically over the same USB connection; you
