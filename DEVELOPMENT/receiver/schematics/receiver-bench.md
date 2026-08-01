@@ -25,10 +25,10 @@ Pin labels below are **Arduino header label (STM32 pin)** — see
    Kill button --------->| A5   (PA6, GPIO in, pull-up)   |
    (other leg -> GND)    |                                |
                         |                                |
-                        | A4   (PA5, TIM2_CH1, PWM) ----->|--[servo signal]
+                        | A4   (PA5, TIM2_CH1, PWM) ----->|--[orange: servo signal]
                         |                                |     SG90 servo
-   5V header ----------->|--------------------------------|---> [servo V+]
-   GND -----------------> |--------------------------------|---> [servo GND]
+   5V header ----------->|--------------------------------|---> [red: servo V+]
+   GND -----------------> |--------------------------------|---> [brown: servo GND]
                         |                                |
                         | A6,D9,D1,D0,D10,D2,D3          |
                         | (7 x GPIO out, segs a..g) ----->|--[R]--[seg a..g]--+

@@ -130,8 +130,12 @@ flips which end of rotation reads 0 vs 255), wiper (center terminal) to
 
 ## SG90 servo
 
-3 wires: signal → **A4 (PA5)**, power → **5V**, ground → GND. The SG90 draws up to
-~250mA stalled — **don't power it from the Nucleo's 3V3 pin** (it's not a
+3 wires, standard SG90 color code:
+- **Brown → GND**
+- **Red → 5V**
+- **Orange → A4 (PA5)** (signal)
+
+The SG90 draws up to ~250mA stalled — **don't power it from the Nucleo's 3V3 pin** (it's not a
 servo-grade rail and it's only 3.3V, out of spec for the servo anyway). Use
 the Nucleo-32's `5V` header pin (sourced from USB when connected via
 ST-Link) for this single low-duty SG90 on the bench. If you see the board
