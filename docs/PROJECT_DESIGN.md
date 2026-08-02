@@ -43,7 +43,9 @@ Drive-by-wire paramotor throttle. Handle-mounted STM32 reads trigger position + 
 Command flags are bits, not an enum values, so kill and start states are never ambiguous and kill can always be checked first regardless of what else is in the packet.
 
 ## Receiver State Machine
-States: `IDLE_SAFE`, `RUNNING`, `STARTING`, `KILLED`
+States: `IDLE_SAFE`, `STARTING`, `KILLED` (no `RUNNING` — manual crank, no
+tach, see ADR 0007; `IDLE_SAFE` covers both "engine off" and "engine
+running", the pilot is the one who knows which)
 
 Per-packet validation order (discard entirely if any step fails):
 1. Sync byte check
@@ -63,6 +65,62 @@ Runs independently of packet reception, on its own timer:
 - **Link recovery**: once packets resume, link must be continuously valid for a stability window (~300ms) before throttle is allowed to respond to pilot input again — prevents a flickering link from causing throttle hunting
 
 All thresholds and ramp durations are **fixed compile-time constants**, tuned during bench testing, not adjustable in flight.
+
+## Tunable Constants Reference
+
+Every constant below is a compile-time `#define` — there is no runtime
+tuning by design (see Design Decisions Log). All of them live in
+`src/common/`, so they're shared by both `handle` and `receiver` builds:
+change one, rebuild both firmwares, rerun `test/test_logic.c`, and
+re-verify on the bench (or the `DEVELOPMENT/receiver` rig) before trusting
+it in the air.
+
+### Protocol timing & throttle shaping (`throttle_protocol.h`)
+
+| Constant | Default | Controls | Tuning notes |
+|---|---|---|---|
+| `HANDLE_TX_RATE_HZ` | 80 | Packets/sec the handle transmits | `HANDLE_TX_PERIOD_MS` is derived from this — don't set it directly. Higher gives fresher throttle data and a faster-reacting watchdog, at the cost of radio airtime/power. |
+| `WATCHDOG_RAMP_START_MS` | 175 | Time since the last valid packet before the receiver starts ramping throttle to idle | Must stay comfortably above the normal inter-packet gap (~12.5 ms at 80 Hz) or normal jitter will trigger false ramps. Lower = faster fail-safe reaction. |
+| `WATCHDOG_FULL_IDLE_MS` | 600 | Time since the last valid packet before the receiver commits fully to idle and marks the link "recovering" | Must be greater than `WATCHDOG_RAMP_START_MS`. Too low risks committing to idle during a brief, recoverable glitch. |
+| `RAMP_TO_IDLE_DURATION_MS` | 400 | Duration of the linear ramp from current throttle down to idle, once triggered | Shorter = snappier fail-safe but a more abrupt throttle cut; longer = gentler but leaves partial throttle applied longer during a real loss event. |
+| `LINK_RESTORE_STABLE_MS` | 300 | After a loss event, how long the link must stay continuously valid before pilot throttle input is honored again | Higher = more confidence the link is genuinely back; lower = faster recovery but more exposure to a flickering link causing throttle hunting. |
+| `MAX_THROTTLE_STEP_PER_TICK` | 6 (0–255 units) | Max throttle change per control tick, always — not just during recovery | Higher = snappier response; lower = smoother servo motion and less mechanical shock on the cable run. |
+| `THROTTLE_DEADBAND` | 3 (0–255 units) | Handle-side hysteresis: the mapped trigger value must move at least this far before a new value is transmitted (0 and 255 always update) | Higher = less servo "hunting" from hand/engine vibration, at the cost of coarser resolution. |
+| `IDLE_THROTTLE_VALUE` | 0 | What "idle" means on the 0–255 scale, matching your servo/cable mapping | The watchdog ramp target and the start gate below are both anchored to this — set it to your actual idle cable position. |
+| `IDLE_THRESHOLD_FOR_START` | 15 (~6% of 0–255) | Throttle must be at/below this for a start request to be honored | Only checked at the `IDLE_SAFE → STARTING` transition itself — not re-checked once cranking, so the pot/trigger is free to move once a crank has begun. Higher tolerates a not-quite-zero idle reading; lower demands a stricter "really closed" throttle before allowing a crank. |
+| `START_HOLD_REQUIRED_MS` | 600 | How long the start button must be held before a start request is sent | Higher reduces the chance of an accidental brush-start; lower is quicker to initiate cranking. |
+| `KILL_DEBOUNCE_MS` | 30 | How long the kill line must read "kill" continuously before it latches | Kill is wired fail-safe, so this never defeats a genuine press or a severed wire — only delays recognizing it slightly. Higher rejects more vibration/contact-bounce glitches; lower reacts faster to a real kill. |
+| `INPUT_DEBOUNCE_MS` | 20 | Debounce window for cruise + accessory inputs | Higher rejects more bounce; lower is more responsive but risks a single press registering as multiple toggles. |
+| `CRUISE_DISENGAGE_THROTTLE_DELTA` | 10 (0–255 units) | How far the trigger must move above the frozen cruise setpoint before cruise disengages | Higher tolerates a light bump on the trigger while cruising; lower disengages cruise more readily on any throttle movement. |
+
+### Manual crank bounds (`throttle_protocol.h`, receiver-only; see ADR 0007)
+
+| Constant | Default | Controls | Tuning notes |
+|---|---|---|---|
+| `MAX_CRANK_MS` | 2000 | Hard backstop: a single crank energization can never exceed this, even if the button is held or `START_REQ` sticks asserted | Needs bench tuning against the actual Moster 185 cold-start behavior (see `docs/OPEN-ITEMS.md`) — long enough to reliably catch, short enough to protect the starter motor. |
+| `CRANK_LOSS_ABORT_MS` | 175 | Stop cranking if no valid packet arrives for this long | Deliberately faster than the general watchdog thresholds above, since cranking blind on a dead link is worse than just holding throttle. Too low risks aborting a normal crank on a brief hiccup. |
+| `STARTER_COOLDOWN_MS` | 3000 | After a *forced* crank stop (backstop or loss-abort — not a normal voluntary release) refuse a new crank this long | Higher gives more starter-motor protection between forced stops; lower allows a quicker retry once the fault clears. Never applies after a normal release. |
+
+### Battery monitor (`battery_monitor.h`, shared by both ends)
+
+| Constant | Default | Controls |
+|---|---|---|
+| `BATTERY_POLL_MS` | 500 | How often the pack voltage is re-read and the LED bar refreshed |
+| `BATTERY_BUZZ_ON_MS` | 120 | Buzzer on-time within each low-battery beep |
+| `BATTERY_BUZZ_PERIOD_MS` | 2000 | Time between low-battery beeps |
+
+Not a `#define`, but worth knowing about: the actual pack voltage curve
+(`full_mv`/`empty_mv`/`low_mv`/`led_count`) is set per unit — `HANDLE_BATT`
+in `handle_firmware.c` and `RX_BATT` in `receiver_firmware.c`. Both are
+currently placeholder values and **must be measured against your real packs**
+before the LED bar or low-battery buzzer mean anything.
+
+### Not tuning knobs
+
+`PACKET_SYNC_BYTE`, the `CMD_FLAG_*` bit assignments, `PACKET_SIZE`, and
+`PACKET_CRC_LEN` are protocol-format constants, not performance knobs —
+both `handle` and `receiver` must agree on them exactly (see
+`protocol-guardian`); there's no "desired performance" tradeoff to tune.
 
 ## Design Decisions Log
 - **No radio-level ack** (`setAutoAck(false)`) — fixed-rate send + sequence number + watchdog covers command delivery without ack round-trip latency. Open question: revisit for kill specifically if confirmed-delivery matters more there.
