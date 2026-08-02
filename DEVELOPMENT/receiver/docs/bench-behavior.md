@@ -36,9 +36,9 @@ PWM, display, buzzer, LEDs — is new, bench-only code in `bench_app.c`.
 | Input | Behavior |
 |---|---|
 | **Kill button** | Debounced over `KILL_DEBOUNCE_MS` (own dedicated window, mirroring the handle's `kill_confirmed()`). Debounced level sets `CMD_FLAG_KILL` in every packet while held/latched-conceptually — but **latching itself happens in the receiver** (`g_state -> STATE_KILLED`), not in the bench code. Once latched: sticky, red LED on, buzzer beeps once on entry, display blinks 0. **Re-arm = power-cycle or press the Nucleo's reset button** — no button or packet field clears it, matching production. |
-| **Start button** | Debounced (`INPUT_DEBOUNCE_MS`) then gated by a `START_HOLD_REQUIRED_MS` hold timer mirroring `start_request_confirmed()`. Once hold-confirmed, `CMD_FLAG_START_REQ` is asserted — the receiver's own independent gate (`IDLE_SAFE` state, throttle ≤ `IDLE_THRESHOLD_FOR_START`, not recovering from loss) still applies on top. While cranking: yellow LED on, servo held at whatever `g_target_throttle` says (idle, typically). Crank ends on release (voluntary) or a forced stop (`MAX_CRANK_MS` backstop or `CRANK_LOSS_ABORT_MS` loss-of-signal abort, both inside the real `crank_tick()`). |
+| **Start button** | Debounced (`INPUT_DEBOUNCE_MS`) then gated by a `START_HOLD_REQUIRED_MS` hold timer mirroring `start_request_confirmed()`. Once hold-confirmed, `CMD_FLAG_START_REQ` is asserted — the receiver's own independent gate (`IDLE_SAFE` state, throttle ≤ `IDLE_THRESHOLD_FOR_START` (15/255, ~6%), not recovering from loss) still applies on top, and **only guards entering `STATE_STARTING`** — it is not re-checked once cranking. While cranking: yellow LED on, servo tracks `g_target_throttle` live, same as any other state (see the pot row below) — the pot is not frozen or ignored during a crank, so the pilot can crack the throttle open mid-crank to help a cold engine catch. Crank ends on release (voluntary) or a forced stop (`MAX_CRANK_MS` backstop or `CRANK_LOSS_ABORT_MS` loss-of-signal abort, both inside the real `crank_tick()`). |
 | **Cruise button** | Debounced (`INPUT_DEBOUNCE_MS`), then a small local mirror of the handle's `apply_cruise()` (rising edge toggles, freezes the pot reading as setpoint, disengages on kill or pulling the pot more than `CRUISE_DISENGAGE_THROTTLE_DELTA` above the setpoint). This runs in `bench_app.c`, not the receiver — matches how cruise is resolved on the real handle and is transparent to the receiver. |
-| **Pot (throttle)** | Scaled 0–4095 (12-bit ADC) → 0–255, fed either live or frozen (if cruise engaged) into the packet's `throttle` field. |
+| **Pot (throttle)** | Scaled 0–4095 (12-bit ADC) → 0–255, fed either live or frozen (if cruise engaged) into the packet's `throttle` field on *every* ingestion tick. In the receiver, `handle_valid_packet()` applies `pkt->throttle` to `g_target_throttle` unconditionally once past the kill/killed checks (`receiver_firmware.c`, the THROTTLE step) — state (`IDLE_SAFE` or `STARTING`) doesn't gate it, only `g_recovering_from_loss` does. So the pot stays live through a crank; only the *start* button's rising edge additionally requires throttle ≤ `IDLE_THRESHOLD_FOR_START` at that instant. |
 
 Every ingestion tick builds a real `throttle_packet_t` (incrementing `seq`,
 a real `crc8_compute()` over the first 4 bytes) and calls
@@ -69,8 +69,9 @@ comment in `bench_actuation_tick()` in `bench_app.c` for the exact check.
 
 ## Verification checklist (do this on real hardware after flashing)
 
-**Confirmed passing on real hardware, 2026-08-01** (STM32L432KC Nucleo-32,
-SB16/SB18 removed — see `wiring.md`):
+**Confirmed passing on real hardware, 2026-08-01 (start/idle-throttle
+interaction added and confirmed 2026-08-02)** — STM32L432KC Nucleo-32,
+SB16/SB18 removed, see `wiring.md`:
 
 - [x] Turning the pot moves the servo smoothly, rate-limited (not snapping).
 - [x] Holding start < `START_HOLD_REQUIRED_MS` and releasing does nothing.
@@ -86,6 +87,16 @@ SB16/SB18 removed — see `wiring.md`):
       blinks. Releasing kill and sending more packets does **not** clear it.
       Only a reset/power-cycle re-arms.
 - [x] Kill during a crank or during cruise immediately overrides both.
+- [x] Starting requires the pot at/near idle (≤ `IDLE_THRESHOLD_FOR_START`,
+      15/255) — pressing start with the pot elevated does nothing, confirmed
+      by debugger readout of `g_state`/`pkt->throttle`, not just the servo.
+      Turning the pot down to true zero (not just "looks like zero" on a
+      breadboard pot) makes start work again.
+- [x] Once cranking, the pot remains live: turning it up moves the servo
+      immediately, without affecting `g_state` or ending the crank. This is
+      intended (`receiver_firmware.c`'s THROTTLE step is unconditional on
+      state, only `g_recovering_from_loss` suppresses it) — not bench-specific
+      behavior.
 - [x] Heartbeat LED blinks continuously and doesn't stall under any of the
       above.
 - [x] `gcc -c -Wall -Wextra -Isrc/common src/receiver/receiver_firmware.c -o receiver.o`
