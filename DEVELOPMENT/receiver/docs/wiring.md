@@ -82,17 +82,19 @@ low regardless of wiring, reproduced identically on two separate boards,
 until this was traced back to the schematic. It is a documented board
 design, not a defect.
 
-**Fix**: locate the solder bridges labeled `SB16` and `SB18` on the PCB
-silkscreen (small pads near the `CN4` connector/`PB6`/`PB7` area — look
-closely on both sides of the board, they're tiny) and cut them, either by
-scoring the connecting trace between the two pads with a hobby knife, or
-by removing the solder blob with a soldering iron + solder wick if they're
-bridged that way instead. Cutting them is exactly what ST's manual
-describes as the "off" state, and restores `A4`/`A5`/`D4`/`D5` to fully
-independent operation — precisely what this design already assumes
-everywhere else. (They're a reversible-ish modification — a solder blob
-can rebridge them later if some future project wants the I2C behavior
-instead.)
+**Fix**: on this board, `SB16`/`SB18` are each implemented as a tiny SMD 0Ω
+resistor (small black rectangular package, not a solder blob or scoreable
+trace), located near the `CN4` connector/`PB6`/`PB7` area — look closely on
+both sides of the board, they're small. Desolder and remove each one: a
+fine-tip iron (a standard chisel tip is too big), heat one end until the
+joint is liquid, gently nudge the resistor off that pad, then repeat on
+the other end if needed; flux helps a lot if you have it. Confirm removal
+with a continuity/resistance check across the two now-separated pads
+(should read open). Removing them is exactly what ST's manual describes as
+the "off" state, and restores `A4`/`A5`/`D4`/`D5` to fully independent
+operation — precisely what this design already assumes everywhere else.
+Keep the removed resistors somewhere safe — re-soldering one back restores
+the I2C-sharing behavior if some future project ever wants it.
 
 **Remove the factory jumper cap between `GND` and `D2` before wiring
 anything.** The board ships with a spare 2-pin jumper cap parked across
