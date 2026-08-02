@@ -1,0 +1,9 @@
+# STM32CubeIDE build output
+DEVELOPMENT/**/firmware/Debug/
+DEVELOPMENT/**/firmware/Release/
+
+# STM32CubeIDE local project preferences (machine-local, not shared config)
+**/.settings/stm32cubeide.project.prefs
+
+# Claude Code session screenshots (not repo content)
+.claude/screenshots/
