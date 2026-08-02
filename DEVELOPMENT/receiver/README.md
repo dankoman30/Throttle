@@ -47,6 +47,14 @@ firmware/
 NUCLEO-L432KC, with `bench_app.c`/`bench_app.h` wired into `main.c`. See
 `docs/cubemx-config.md` for how it was configured and how to regenerate it.
 
+## Board mod required
+
+This board revision ships with solder bridges `SB16`/`SB18` closed by
+default, which internally tie `PA6`↔`PB6` and `PA5`↔`PB7` together —
+directly conflicting with this pin plan (kill button + yellow LED, servo
+PWM + heartbeat LED). **Cut both before wiring anything** — see "Required
+board mod" in `docs/wiring.md`.
+
 ## Bill of materials (this bench rig)
 
 - STM32L432KC Nucleo-32

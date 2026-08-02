@@ -5,6 +5,11 @@ will eventually live under CERN-OHL-S). This is a breadboard-level diagram
 for the bench rig only, sufficient to wire it up; see `../docs/wiring.md`
 for exact pin names and resistor values.
 
+**Before wiring anything to `A4`/`A5`/`D4`/`D5`: cut solder bridges `SB16`
+and `SB18` on the PCB.** They're closed by default on this board revision
+and internally tie `PA6`↔`PB6` and `PA5`↔`PB7` together — see "Required
+board mod" in `../docs/wiring.md` for the full explanation and how-to.
+
 ## Block diagram
 
 Pin labels below are **Arduino header label (STM32 pin)** — see

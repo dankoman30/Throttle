@@ -60,6 +60,40 @@ That leaves exactly 17 free GPIOs, which is exactly what this bench rig
 needs — no margin, so if you add anything later you'll need to drop
 something else or move to a bigger Nucleo.
 
+## Required board mod: cut SB16 and SB18 before wiring A4/A5/D4/D5
+
+**This is not optional for this pin plan — do it before wiring the kill
+button, servo, yellow LED, or heartbeat LED.** Confirmed from ST's own
+board manual (UM1956, "Table 8. Solder bridges"), this board (Rev C, which
+is what ships today) has two solder bridges **closed by default**:
+
+- **SB16**: ties `PB6` (`D5`) to `A5` (`PA6`) for optional I2C SDA support
+  on `A5`. Per the manual, when SB16 is on, *"PA6 must be configured as
+  input floating"* — i.e. `D5`/`PB6` and `A5`/`PA6` are not independent
+  pins, they're electrically the same node.
+- **SB18**: same thing for `PA5` (`A4`) and `PB7` (`D4`), I2C SCL.
+
+In this pin plan, `A5`/`PA6` is the **kill button** and `D5`/`PB6` is the
+**yellow LED**; `A4`/`PA5` is the **servo PWM** and `D4`/`PB7` is the
+**heartbeat LED**. With the bridges closed, each LED's push-pull GPIO
+output fights the paired input pin's pull-up/PWM signal through the
+bridge — this is exactly what caused the kill button to read permanently
+low regardless of wiring, reproduced identically on two separate boards,
+until this was traced back to the schematic. It is a documented board
+design, not a defect.
+
+**Fix**: locate the solder bridges labeled `SB16` and `SB18` on the PCB
+silkscreen (small pads near the `CN4` connector/`PB6`/`PB7` area — look
+closely on both sides of the board, they're tiny) and cut them, either by
+scoring the connecting trace between the two pads with a hobby knife, or
+by removing the solder blob with a soldering iron + solder wick if they're
+bridged that way instead. Cutting them is exactly what ST's manual
+describes as the "off" state, and restores `A4`/`A5`/`D4`/`D5` to fully
+independent operation — precisely what this design already assumes
+everywhere else. (They're a reversible-ish modification — a solder blob
+can rebridge them later if some future project wants the I2C behavior
+instead.)
+
 **Remove the factory jumper cap between `GND` and `D2` before wiring
 anything.** The board ships with a spare 2-pin jumper cap parked across
 `GND`/`D2` (`PA12`) on CN3 — it's not a functional connection, just a safe
