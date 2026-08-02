@@ -69,23 +69,26 @@ comment in `bench_actuation_tick()` in `bench_app.c` for the exact check.
 
 ## Verification checklist (do this on real hardware after flashing)
 
-- [ ] Turning the pot moves the servo smoothly, rate-limited (not snapping).
-- [ ] Holding start < `START_HOLD_REQUIRED_MS` and releasing does nothing.
-- [ ] Holding start ≥ that duration (with pot near idle) enters
+**Confirmed passing on real hardware, 2026-08-01** (STM32L432KC Nucleo-32,
+SB16/SB18 removed — see `wiring.md`):
+
+- [x] Turning the pot moves the servo smoothly, rate-limited (not snapping).
+- [x] Holding start < `START_HOLD_REQUIRED_MS` and releasing does nothing.
+- [x] Holding start ≥ that duration (with pot near idle) enters
       `STATE_STARTING`: yellow on, then releasing → green on, yellow off.
-- [ ] Holding start past `MAX_CRANK_MS` auto-stops the crank: yellow off,
+- [x] Holding start past `MAX_CRANK_MS` auto-stops the crank: yellow off,
       **green stays off** (forced stop).
-- [ ] Pressing cruise while throttle is above `IDLE_THRESHOLD_FOR_START`
+- [x] Pressing cruise while throttle is above `IDLE_THRESHOLD_FOR_START`
       freezes the servo at that setpoint even after releasing the pot to
       idle; pushing the pot well past the setpoint disengages it; pressing
       cruise again disengages it too.
-- [ ] Pressing kill: red on, buzzer beeps, servo goes to idle, display
+- [x] Pressing kill: red on, buzzer beeps, servo goes to idle, display
       blinks. Releasing kill and sending more packets does **not** clear it.
       Only a reset/power-cycle re-arms.
-- [ ] Kill during a crank or during cruise immediately overrides both.
-- [ ] Heartbeat LED blinks continuously and doesn't stall under any of the
+- [x] Kill during a crank or during cruise immediately overrides both.
+- [x] Heartbeat LED blinks continuously and doesn't stall under any of the
       above.
-- [ ] `gcc -c -Wall -Wextra -Isrc/common src/receiver/receiver_firmware.c -o receiver.o`
+- [x] `gcc -c -Wall -Wextra -Isrc/common src/receiver/receiver_firmware.c -o receiver.o`
       still succeeds with only the pre-existing expected warning
       (`on_packet_received` unused) — confirms the one-line `millis()`
       change didn't disturb the host-side compile-check.
