@@ -127,8 +127,20 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   and `THROTTLE_DEADBAND` on real hardware. (Raised by instructor feedback on
   servo-from-analog control: debounce, damping, hysteresis.)
 - [ ] Generate the STM32CubeIDE projects (none committed yet).
-- [ ] Open question: does **kill** warrant a confirmed-delivery/ack path, versus
-  the current fixed-rate send + latch? See `docs/decisions/0001-no-radio-ack.md`.
+- [x] ~~Open question: does **kill** warrant a confirmed-delivery/ack path~~ —
+  **resolved: no.** Kill's latch+resend already survives arbitrary packet
+  loss on its own, and a fully-dead link (the only case ACK could help) is
+  already covered by the independent mechanical kill line. Auto-ack also
+  risks blocking sends longer exactly under the ignition-EMI condition ADR
+  0005 already flags as the dominant threat. See the 2026-08-02 addendum in
+  `docs/decisions/0001-no-radio-ack.md`.
+- [ ] **Telemetry downlink (receiver → handle), deferred.** Receiver battery
+  level and receiver state currently have no path to the pilot at all — worth
+  building eventually, but as a separate, strictly one-way, structurally
+  isolated feature (own packet type/pipe, never able to delay or gate a
+  control packet), after the primary control link is working. Not a
+  flight-readiness blocker on its own; see the same addendum for the
+  reasoning and constraints.
 - [ ] Low priority: evaluate **CRC8 → CRC16** given the EMI environment (packet
   5→6 bytes). CRC8 is defensible today — sync + seq filtering plus throttle
   rate-limiting contain any single false-accept — but worth revisiting if the
