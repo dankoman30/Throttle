@@ -67,6 +67,24 @@ same static global (visible via the `#include`) and only lights green if it
 did *not* just get set to a future value on this transition. See the
 comment in `bench_actuation_tick()` in `bench_app.c` for the exact check.
 
+## Tunable constants — bench rig only
+
+These live in `firmware/Src/bench_app.c` / `firmware/Inc/bench_app.h`, not
+`src/common/` — they only affect this bench rig's own display/servo/beep
+mapping, not the real safety state machine, so they're safe to change
+freely without a `safety-reviewer` pass. For the actual safety-critical
+timing/threshold constants (crank timeout, idle threshold for start,
+watchdog thresholds, etc. — shared by both `handle` and `receiver`), see
+the **Tunable Constants Reference** in `docs/PROJECT_DESIGN.md`.
+
+| Constant | Default | Controls |
+|---|---|---|
+| `SERVO_PULSE_MIN_US` / `SERVO_PULSE_MAX_US` | 1000 / 2000 | Pulse-width range mapped from throttle 0–255. Adjust to your specific SG90's actual measured travel endpoints if the datasheet range doesn't quite match observed behavior. |
+| `DISPLAY_BLINK_MS` | 300 | Blink half-period for the 7-segment display while `STATE_KILLED`. |
+| `BENCH_BEEP_MS` | 80 | Buzzer click duration on entering `STATE_KILLED` or `STATE_STARTING`. |
+| `HEARTBEAT_PERIOD_MS` | 200 | Heartbeat LED toggle period (~2.5Hz visible rate) — purely a "loop hasn't hung" indicator, not a timing-sensitive value. |
+| `DISPLAY_COMMON_ANODE` (in `bench_app.h`) | 0 (cathode) | Segment drive polarity — a hardware-wiring flag, not a performance knob. Must match your actual 7-segment display's datasheet. |
+
 ## Verification checklist (do this on real hardware after flashing)
 
 **Confirmed passing on real hardware, 2026-08-01 (start/idle-throttle
