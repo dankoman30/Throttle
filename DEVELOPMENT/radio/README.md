@@ -1,8 +1,8 @@
 # DEVELOPMENT/radio — RF24 HAL port & radio link bring-up
 
-**Status: hardware being ordered, nothing built yet.** This doc exists so
-picking this up when the parts arrive doesn't require re-deriving context
-from scratch.
+**Status: transceivers + Nucleo boards ordered; capacitors + logic analyzer
+still to order; nothing built yet.** This doc exists so picking this up when
+the parts arrive doesn't require re-deriving context from scratch.
 
 ## What this covers
 
@@ -14,42 +14,86 @@ both ends is already proven (`DEVELOPMENT/receiver/`), but nothing has actually
 gone over the air yet. `docs/OPEN-ITEMS.md` flags the RF24 HAL port as staying
 "on the critical path" for exactly this reason.
 
-## On order
+## Hardware inventory
 
-1. **3x nRF24L01+PA+LNA modules** (2 for the link + 1 spare). Clone chips
-   (silkscreened as genuine Nordic but actually `SI24R1`/Beken parts) are a
-   known problem for this exact module category and can't be reliably told
-   apart by inspection (Nordic is fabless; markings vary by fab run) — the
-   practical mitigation is buying multiple units from one reputable, consistent
-   source rather than mixing cheap unverified listings, per ADR 0005's "not
-   clone boards" requirement. Considered reliable for this assembled module:
-   [Addicore](https://www.addicore.com/products/nrf24l01-pa-lna-with-antenna-2-4ghz-wireless-transceiver)
-   (~$6/module), [ProtoSupplies](https://protosupplies.com/product/nrf24l01palna-2-4ghz-rf-wireless-module/),
-   [HandsOn Tech](https://handsontec.com/index.php/product/nrf24l01palna-2-4ghz-rf-transceiver-module/).
-   Get the version with a **fixed/soldered antenna** (or confirm one's
-   included if SMA) — some boards ship bare with no antenna.
-2. **A third STM32L432KC Nucleo-32.** The existing two are both tied up in
-   the fully-wired, SB16/SB18-modified, already-verified receiver bench rig
-   (`../receiver/`) — do the initial radio bring-up on a fresh board instead
-   of disturbing that one.
-3. **Decoupling capacitors**: 10µF+ (electrolytic/tantalum) plus a 0.1µF
-   ceramic across each module's V+/GND pins, placed as close to the module as
-   physically possible. **Known failure mode without this**: the PA+LNA
-   variant draws real current spikes on TX (order ~100+mA) that a Nucleo's
-   small onboard 3.3V LDO isn't sized for — this is one of the most common
-   causes of "the radio just doesn't work / works intermittently" reports for
-   this module. If it's still flaky with local decoupling, move to a
-   dedicated 3.3V supply rather than the Nucleo's onboard rail.
-4. **A cheap 8-channel Saleae-compatible logic analyzer** (~$10–25, e.g. a
-   24MHz DFRobot-class clone). Already on the toolchain wishlist in
-   `docs/PROJECT_DESIGN.md`; SPI bring-up (SCK/MOSI/MISO/CSN/CE — 5 signals,
-   comfortably within 8 channels) is exactly the task it's for, and would
-   have shortened the SB16/SB18 debugging saga considerably had we had it
-   for register-level visibility instead of just GPIO reads.
+**Ordered:**
+1. **4x nRF24L01+PA+LNA modules**, from [Addicore](https://www.addicore.com/products/nrf24l01-pa-lna-with-antenna-2-4ghz-wireless-transceiver)
+   (2 for the link + 2 spares). Clone chips (silkscreened as genuine Nordic
+   but actually `SI24R1`/Beken parts) are a known problem for this exact
+   module category and can't be reliably told apart by inspection (Nordic is
+   fabless; markings vary by fab run) — buying multiple units from one
+   reputable, consistent source is the practical mitigation, per ADR 0005's
+   "not clone boards" requirement.
+2. **2 additional STM32L432KC Nucleo-32 boards**, ordered directly from ST.
+   Combined with the two already on hand, that's **4 total boards — only 1
+   (the current receiver bench rig) has SB16/SB18 removed.** The other
+   existing board and both new ones are stock/unmodified. See the SPI pin
+   mapping note below before wiring any of the three unmodified boards for
+   radio — it's directly relevant.
 
-No level shifting needed either way — the module's SPI inputs are 5V-tolerant
-and its onboard regulator accepts 1.9–3.6V, so it's a direct match for the
-L432KC's 3.3V logic.
+**Still to order:**
+3. **Decoupling capacitors** — need 2 types, at each module's V+/GND pins:
+   - **Bulk, 10–100µF** electrolytic or tantalum, rated **16V or 25V** (for
+     margin, even though this only runs at 3.3V), through-hole/radial leads
+     for breadboard use. Get at least 8 (4 modules + spares/iteration).
+   - **0.1µF (100nF) ceramic**, X7R dielectric if specified, 25V+, through-hole
+     disc. Get at least 8.
+   - Rather than hunting exact single-value listings, a generic
+     **"electrolytic capacitor assortment kit"** + **"ceramic capacitor
+     assortment kit"** (common on Amazon/DigiKey) is the pragmatic move —
+     covers these values plus leaves spares for other bench needs (ADR 0005
+     also wants supply decoupling on the receiver's STM32 rail, separately).
+   - **Known failure mode without this**: the PA+LNA variant draws real
+     current spikes on TX (order ~100+mA) that a Nucleo's small onboard 3.3V
+     LDO isn't sized for — one of the most common causes of "the radio just
+     doesn't work / works intermittently" reports for this module. If it's
+     still flaky with local decoupling, move to a dedicated 3.3V supply
+     rather than the Nucleo's onboard rail.
+4. **An 8-channel, 24MHz USB logic analyzer** (~$10–25; search "8 channel
+   24MHz USB logic analyzer" — near-universally the same Cypress FX2LP-based
+   hardware regardless of seller, often marketed loosely as a "Saleae Logic
+   clone"). Pair it with **sigrok / PulseView** (free, open source) via its
+   `fx2lafw` driver — PulseView has a **built-in SPI protocol decoder**, so
+   feeding it SCK/MOSI/MISO/CSN shows decoded byte-level SPI transactions
+   directly, not just raw waveforms, which is exactly what's needed to check
+   nRF24 register reads/writes against the datasheet. Already on the
+   toolchain wishlist in `docs/PROJECT_DESIGN.md`; would have shortened the
+   SB16/SB18 debugging saga considerably had we had register-level SPI
+   visibility instead of just GPIO reads. **Caution**: these clones typically
+   have minimal input protection and are 3.3V-logic-only — fine for this SPI
+   work (everything here is 3.3V) but don't probe 5V signals (e.g. the
+   servo's 5V rail) with it.
+
+No level shifting needed for the radio modules either way — their SPI inputs
+are 5V-tolerant and the onboard regulator accepts 1.9–3.6V, a direct match
+for the L432KC's 3.3V logic.
+
+## SPI pin mapping: use PB3/PB4/PB5, not the PA5/PA6/PA7 default
+
+**Important given 3 of the 4 boards don't have SB16/SB18 removed.** The
+STM32L432KC's *default* SPI1 alternate-function mapping is `PA5`=SCK,
+`PA6`=MISO, `PA7`=MOSI (AF5) — which is exactly the pin pair SB16/SB18
+bridge to `PB6`/`PB7`. Using the default mapping on any unmodified board
+would reproduce the same "two header pins are secretly one net" problem that
+caused the kill-button saga, except manifesting as corrupted/garbled SPI
+transactions rather than a flat stuck signal — likely *harder* to diagnose.
+
+STM32L432KC also supports an **alternate SPI1 mapping on `PB3`/`PB4`/`PB5`**
+(also AF5). **Use that mapping in CubeMX for the initial bring-up boards** —
+it sidesteps the solder-bridge pins entirely, so none of the 3 unmodified
+boards need SB16/SB18 removed just to get SPI working. One cosmetic note:
+`PB3` is wired to the onboard LED `LD3`, so it'll flicker with SPI clock
+activity — harmless, not a real conflict.
+
+**Correction: this does not solve the receiver bench rig's pin problem** —
+an earlier draft of this note incorrectly claimed it did. `PB4`/`PB5` are
+already committed there too — Green LED and Red LED respectively
+(`../receiver/docs/wiring.md`) — so the alternate mapping just trades one
+conflict (solder bridges) for a different one (existing LED wiring) on that
+specific board. That board's issue is genuinely zero free pins, not a
+solder-bridge issue, and is already tracked separately below (Nucleo-64
+fallback). The SPI mapping choice here only matters for the 3 fresh,
+otherwise-unwired boards used for initial bring-up.
 
 ## Open design decision: adapt an existing STM32 fork, or write a minimal custom driver
 
