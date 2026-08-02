@@ -7,3 +7,4 @@ DEVELOPMENT/**/firmware/Release/
 
 # Claude Code session screenshots (not repo content)
 .claude/screenshots/
+DEVELOPMENT/receiver/firmware/.settings/com.st.stm32cube.ide.mcu.sfrview.prefs
