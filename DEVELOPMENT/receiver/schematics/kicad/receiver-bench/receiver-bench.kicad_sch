@@ -3414,16 +3414,9 @@
 			)
 		)
 	)
-	(wire
-		(pts
-			(xy 121 80.01) (xy 118.11 80.01)
-		)
-		(stroke (width 0) (type default))
-		(uuid "aa000000-0000-4000-8000-000000000301")
-	)
 	(symbol
 		(lib_id "power:PWR_FLAG")
-		(at 121 80.01 0)
+		(at 118.11 80.01 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -3432,15 +3425,15 @@
 		(dnp no)
 		(uuid "aa000000-0000-4000-8000-000000000302")
 		(property "Reference" "#FLG01"
-			(at 121 78.105 0) (hide yes)
+			(at 115 80.01 0) (hide yes)
 			(effects (font (size 1.27 1.27)))
 		)
 		(property "Value" "PWR_FLAG"
-			(at 121 76.708 0)
+			(at 112 80.01 0)
 			(effects (font (size 1.27 1.27)))
 		)
-		(property "Footprint" "" (at 121 80.01 0) (hide yes) (effects (font (size 1.27 1.27))))
-		(property "Datasheet" "" (at 121 80.01 0) (hide yes) (effects (font (size 1.27 1.27))))
+		(property "Footprint" "" (at 118.11 80.01 0) (hide yes) (effects (font (size 1.27 1.27))))
+		(property "Datasheet" "" (at 118.11 80.01 0) (hide yes) (effects (font (size 1.27 1.27))))
 		(pin "1" (uuid "aa000000-0000-4000-8000-000000000303"))
 		(instances
 			(project "receiver-bench"
@@ -3451,16 +3444,9 @@
 			)
 		)
 	)
-	(wire
-		(pts
-			(xy 121 97.79) (xy 118.11 97.79)
-		)
-		(stroke (width 0) (type default))
-		(uuid "aa000000-0000-4000-8000-000000000304")
-	)
 	(symbol
 		(lib_id "power:PWR_FLAG")
-		(at 121 97.79 0)
+		(at 118.11 97.79 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -3469,15 +3455,15 @@
 		(dnp no)
 		(uuid "aa000000-0000-4000-8000-000000000305")
 		(property "Reference" "#FLG02"
-			(at 121 95.885 0) (hide yes)
+			(at 115 97.79 0) (hide yes)
 			(effects (font (size 1.27 1.27)))
 		)
 		(property "Value" "PWR_FLAG"
-			(at 121 94.488 0)
+			(at 112 97.79 0)
 			(effects (font (size 1.27 1.27)))
 		)
-		(property "Footprint" "" (at 121 97.79 0) (hide yes) (effects (font (size 1.27 1.27))))
-		(property "Datasheet" "" (at 121 97.79 0) (hide yes) (effects (font (size 1.27 1.27))))
+		(property "Footprint" "" (at 118.11 97.79 0) (hide yes) (effects (font (size 1.27 1.27))))
+		(property "Datasheet" "" (at 118.11 97.79 0) (hide yes) (effects (font (size 1.27 1.27))))
 		(pin "1" (uuid "aa000000-0000-4000-8000-000000000306"))
 		(instances
 			(project "receiver-bench"
@@ -3488,16 +3474,9 @@
 			)
 		)
 	)
-	(wire
-		(pts
-			(xy 263 170) (xy 260 170)
-		)
-		(stroke (width 0) (type default))
-		(uuid "aa000000-0000-4000-8000-000000000307")
-	)
 	(symbol
 		(lib_id "power:PWR_FLAG")
-		(at 263 170 0)
+		(at 260 170 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -3506,15 +3485,15 @@
 		(dnp no)
 		(uuid "aa000000-0000-4000-8000-000000000308")
 		(property "Reference" "#FLG03"
-			(at 263 168.095 0) (hide yes)
+			(at 256 170 0) (hide yes)
 			(effects (font (size 1.27 1.27)))
 		)
 		(property "Value" "PWR_FLAG"
-			(at 263 166.698 0)
+			(at 253 170 0)
 			(effects (font (size 1.27 1.27)))
 		)
-		(property "Footprint" "" (at 263 170 0) (hide yes) (effects (font (size 1.27 1.27))))
-		(property "Datasheet" "" (at 263 170 0) (hide yes) (effects (font (size 1.27 1.27))))
+		(property "Footprint" "" (at 260 170 0) (hide yes) (effects (font (size 1.27 1.27))))
+		(property "Datasheet" "" (at 260 170 0) (hide yes) (effects (font (size 1.27 1.27))))
 		(pin "1" (uuid "aa000000-0000-4000-8000-000000000309"))
 		(instances
 			(project "receiver-bench"
