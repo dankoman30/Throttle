@@ -8,3 +8,11 @@ DEVELOPMENT/**/firmware/Release/
 # Claude Code session screenshots (not repo content)
 .claude/screenshots/
 DEVELOPMENT/receiver/firmware/.settings/com.st.stm32cube.ide.mcu.sfrview.prefs
+
+# KiCad local project state / generated reports (machine-local, not shared config)
+DEVELOPMENT/**/kicad/**/*.kicad_prl
+DEVELOPMENT/**/kicad/**/*.lck
+DEVELOPMENT/**/kicad/**/ERC.rpt
+
+# Editor local-history auto-backups (not repo content, has its own nested .git)
+**/.history/
