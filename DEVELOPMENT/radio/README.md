@@ -1,7 +1,12 @@
 # DEVELOPMENT/radio — RF24 HAL port & radio link bring-up
 
-**Status: all hardware ordered, nothing built yet.** This doc exists so
-picking this up when the parts arrive doesn't require re-deriving context
+**Status: logic analyzer + both capacitor kits have arrived; still waiting on
+the nRF24L01+PA+LNA modules and the 2 spare Nucleo boards. Nothing built
+yet.** The real bring-up needs the still-missing items, but one thing is
+worth doing now: a PulseView smoke test to confirm the logic analyzer is
+recognized and capturing (see item 4 below) — cheap to knock out early
+rather than discover an issue with it mid-bring-up later. This doc exists so
+picking this up once everything's in doesn't require re-deriving context
 from scratch.
 
 ## What this covers
@@ -16,7 +21,7 @@ gone over the air yet. `docs/OPEN-ITEMS.md` flags the RF24 HAL port as staying
 
 ## Hardware inventory
 
-**Ordered:**
+**Still in transit:**
 1. **4x nRF24L01+PA+LNA modules**, from [Addicore](https://www.addicore.com/products/nrf24l01-pa-lna-with-antenna-2-4ghz-wireless-transceiver)
    (2 for the link + 2 spares). Clone chips (silkscreened as genuine Nordic
    but actually `SI24R1`/Beken parts) are a known problem for this exact
@@ -31,6 +36,7 @@ gone over the air yet. `docs/OPEN-ITEMS.md` flags the RF24 HAL port as staying
    mapping note below before wiring any of the three unmodified boards for
    radio — it's directly relevant.
 
+**Arrived:**
 3. **Decoupling capacitors**, from Amazon:
    - ALLECIN 24-value electrolytic capacitor assortment kit (0.1µF–1000µF,
      10V/16V/25V/50V). Use the **16V or 25V** parts for this (not the 10V
@@ -50,9 +56,10 @@ gone over the air yet. `docs/OPEN-ITEMS.md` flags the RF24 HAL port as staying
    includes base module, breadboard breakout board, USB-A + Type-C cables,
    test clips, alligator clips). This is the same class of Cypress
    FX2LP-based hardware behind most "Saleae Logic clone" listings — pair it
-   with **sigrok / PulseView** (free, open source) via its `fx2lafw` driver
-   once it arrives (confirm PulseView detects it as a first smoke test).
-   PulseView has a **built-in SPI protocol decoder**, so feeding it
+   with **sigrok / PulseView** (free, open source) via its `fx2lafw` driver —
+   worth doing a first smoke test now (confirm PulseView detects it) rather
+   than waiting until it's needed mid-bring-up. PulseView has a **built-in
+   SPI protocol decoder**, so feeding it
    SCK/MOSI/MISO/CSN shows decoded byte-level SPI transactions directly, not
    just raw waveforms — exactly what's needed to check nRF24 register
    reads/writes against the datasheet. Already on the toolchain wishlist in
