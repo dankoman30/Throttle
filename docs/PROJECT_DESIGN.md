@@ -92,6 +92,8 @@ it in the air.
 | `KILL_DEBOUNCE_MS` | 30 | How long the kill line must read "kill" continuously before it latches | Kill is wired fail-safe, so this never defeats a genuine press or a severed wire — only delays recognizing it slightly. Higher rejects more vibration/contact-bounce glitches; lower reacts faster to a real kill. |
 | `INPUT_DEBOUNCE_MS` | 20 | Debounce window for cruise + accessory inputs | Higher rejects more bounce; lower is more responsive but risks a single press registering as multiple toggles. |
 | `CRUISE_DISENGAGE_THROTTLE_DELTA` | 10 (0–255 units) | How far the trigger must move above the frozen cruise setpoint before cruise disengages | Higher tolerates a light bump on the trigger while cruising; lower disengages cruise more readily on any throttle movement. |
+| `CRUISE_REARM_THROTTLE_THRESHOLD` | 8 (0–255 units) | Third cruise-disengage path: counts as "neutral" (to start the hold below) and as "real input" (to actually cancel) — same value both directions, see ADR 0004's 2026-08-03 addendum for why | Higher makes both the neutral-detection and the retake-sensitivity more lenient; lower requires the pilot to release further and move more deliberately to trigger either half. |
+| `CRUISE_IDLE_REARM_DELAY_MS` | 2000 | How long the trigger must sit continuously at/below `CRUISE_REARM_THROTTLE_THRESHOLD` (cruise engaged) before the next input above it cancels cruise | Any dip back above the threshold during the wait resets this timer. Higher makes the escape harder to trigger by accident (or on a longer intentional pause); lower makes it more readily available. |
 
 ### Manual crank bounds (`throttle_protocol.h`, receiver-only; see ADR 0007)
 

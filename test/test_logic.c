@@ -40,9 +40,18 @@ static bool kill_confirmed_m(killdb_t *k, bool active, uint32_t now) {
 
 /* --- mirror of handle_firmware.c:apply_cruise (pure form) ---
  * State passed explicitly instead of via file statics. */
-typedef struct { bool engaged; uint8_t setpoint; bool btn_last; bool kill; } cruise_t;
+typedef struct {
+    bool     engaged;
+    uint8_t  setpoint;
+    bool     btn_last;
+    bool     kill;
+    /* idle-then-retake escape state */
+    bool     idle_last;
+    uint32_t idle_since;
+    bool     idle_rearmed;
+} cruise_t;
 
-static uint8_t cruise_step(cruise_t *c, bool btn, uint8_t live) {
+static uint8_t cruise_step(cruise_t *c, bool btn, uint8_t live, uint32_t now) {
     bool rising = btn && !c->btn_last;
     c->btn_last = btn;
 
@@ -57,6 +66,25 @@ static uint8_t cruise_step(cruise_t *c, bool btn, uint8_t live) {
     }
     if (c->engaged) {
         if ((int)live > (int)c->setpoint + CRUISE_DISENGAGE_THROTTLE_DELTA) c->engaged = false;
+    }
+
+    if (c->engaged) {
+        bool idle_now = live <= CRUISE_REARM_THROTTLE_THRESHOLD;
+        if (idle_now && !c->idle_last) {
+            c->idle_since = now;
+            c->idle_rearmed = false;
+        }
+        c->idle_last = idle_now;
+
+        if (idle_now && !c->idle_rearmed && (now - c->idle_since) >= CRUISE_IDLE_REARM_DELAY_MS) {
+            c->idle_rearmed = true;
+        }
+        if (c->idle_rearmed && !idle_now) {
+            c->engaged = false;
+        }
+    } else {
+        c->idle_last = false;
+        c->idle_rearmed = false;
     }
     return c->engaged ? c->setpoint : live;
 }
@@ -143,32 +171,85 @@ int main(void) {
 
     /* --- cruise: engage holds setpoint through trigger RELEASE (the point) --- */
     { cruise_t c = {0};
-      CHECK(cruise_step(&c, false, 120) == 120);   /* no button: passthrough */
-      CHECK(cruise_step(&c, true, 120) == 120);    /* press engages at 120 */
+      CHECK(cruise_step(&c, false, 120, 0) == 120);   /* no button: passthrough */
+      CHECK(cruise_step(&c, true, 120, 0) == 120);    /* press engages at 120 */
       CHECK(c.engaged && c.setpoint == 120);
-      CHECK(cruise_step(&c, false, 0) == 120);     /* trigger fully released -> still 120 */
-      CHECK(cruise_step(&c, false, 60) == 120);    /* partial squeeze below hold -> still 120 */
-      CHECK(cruise_step(&c, false, 125) == 120);   /* small pull within delta -> held */
+      CHECK(cruise_step(&c, false, 0, 0) == 120);     /* trigger fully released -> still 120 (instantly) */
+      CHECK(cruise_step(&c, false, 60, 0) == 120);    /* partial squeeze below hold -> still 120 */
+      CHECK(cruise_step(&c, false, 125, 0) == 120);   /* small pull within delta -> held */
       CHECK(c.engaged);
     }
     /* --- cruise: pulling ABOVE setpoint+delta overrides to manual, follows live --- */
     { cruise_t c = {0};
-      cruise_step(&c, true, 120);                  /* engage @120 */
-      uint8_t out = cruise_step(&c, false, 120 + CRUISE_DISENGAGE_THROTTLE_DELTA + 1);
+      cruise_step(&c, true, 120, 0);                  /* engage @120 */
+      uint8_t out = cruise_step(&c, false, 120 + CRUISE_DISENGAGE_THROTTLE_DELTA + 1, 0);
       CHECK(!c.engaged && out == 120 + CRUISE_DISENGAGE_THROTTLE_DELTA + 1);
     }
     /* --- cruise: second press toggles off --- */
     { cruise_t c = {0};
-      cruise_step(&c, true, 120); CHECK(c.engaged);
-      cruise_step(&c, false, 120);                 /* release button (no edge) */
-      cruise_step(&c, true, 120); CHECK(!c.engaged); /* second press disengages */
+      cruise_step(&c, true, 120, 0); CHECK(c.engaged);
+      cruise_step(&c, false, 120, 0);                 /* release button (no edge) */
+      cruise_step(&c, true, 120, 0); CHECK(!c.engaged); /* second press disengages */
     }
     /* --- cruise: kill always disengages, and won't engage at/below idle --- */
     { cruise_t c = {0}; c.kill = true;
-      cruise_step(&c, true, 120); CHECK(!c.engaged);
+      cruise_step(&c, true, 120, 0); CHECK(!c.engaged);
     }
     { cruise_t c = {0};
-      cruise_step(&c, true, IDLE_THRESHOLD_FOR_START); CHECK(!c.engaged); /* too low to engage */
+      cruise_step(&c, true, IDLE_THRESHOLD_FOR_START, 0); CHECK(!c.engaged); /* too low to engage */
+    }
+
+    /* --- cruise: idle-then-retake escape --- */
+    /* full continuous idle hold, then a real move afterward -> disengages */
+    { cruise_t c = {0};
+      cruise_step(&c, true, 120, 0);                                     /* engage @120 */
+      CHECK(cruise_step(&c, false, CRUISE_REARM_THROTTLE_THRESHOLD, 1000) == 120); /* release to idle */
+      CHECK(c.engaged);                                                  /* not yet 2s */
+      CHECK(cruise_step(&c, false, CRUISE_REARM_THROTTLE_THRESHOLD,
+                         1000 + CRUISE_IDLE_REARM_DELAY_MS - 1) == 120);  /* still short of the hold */
+      CHECK(c.engaged);
+      CHECK(cruise_step(&c, false, CRUISE_REARM_THROTTLE_THRESHOLD,
+                         1000 + CRUISE_IDLE_REARM_DELAY_MS) == 120);      /* hold satisfied, but no move yet */
+      CHECK(c.engaged);                                                  /* arming alone must NOT disengage */
+      uint8_t out = cruise_step(&c, false, CRUISE_REARM_THROTTLE_THRESHOLD + 1,
+                                 1000 + CRUISE_IDLE_REARM_DELAY_MS + 5);  /* first real move after arming */
+      CHECK(!c.engaged && out == CRUISE_REARM_THROTTLE_THRESHOLD + 1);
+    }
+    /* a brief excursion above the threshold during the wait resets the hold timer */
+    { cruise_t c = {0};
+      cruise_step(&c, true, 120, 0);
+      cruise_step(&c, false, CRUISE_REARM_THROTTLE_THRESHOLD, 0);        /* idle at t=0 */
+      cruise_step(&c, false, CRUISE_REARM_THROTTLE_THRESHOLD + 1, 1500); /* brief blip above threshold */
+      /* back to idle just after the ORIGINAL window would have elapsed */
+      CHECK(cruise_step(&c, false, CRUISE_REARM_THROTTLE_THRESHOLD, 1900) == 120);
+      CHECK(c.engaged);
+      /* hasn't been continuously idle for a full window since the blip yet */
+      CHECK(cruise_step(&c, false, CRUISE_REARM_THROTTLE_THRESHOLD,
+                         1900 + CRUISE_IDLE_REARM_DELAY_MS - 1) == 120);
+      CHECK(c.engaged);
+      /* NOW a full window has elapsed since returning to idle at t=1900 */
+      cruise_step(&c, false, CRUISE_REARM_THROTTLE_THRESHOLD, 1900 + CRUISE_IDLE_REARM_DELAY_MS);
+      uint8_t out = cruise_step(&c, false, CRUISE_REARM_THROTTLE_THRESHOLD + 1,
+                                 1900 + CRUISE_IDLE_REARM_DELAY_MS + 5);
+      CHECK(!c.engaged && out == CRUISE_REARM_THROTTLE_THRESHOLD + 1);
+    }
+    /* resting at idle indefinitely, with no further move, never disengages on its own */
+    { cruise_t c = {0};
+      cruise_step(&c, true, 120, 0);
+      cruise_step(&c, false, 0, 0);
+      cruise_step(&c, false, 0, CRUISE_IDLE_REARM_DELAY_MS);      /* armed now */
+      CHECK(c.engaged);
+      cruise_step(&c, false, 0, CRUISE_IDLE_REARM_DELAY_MS + 60000); /* a full minute later, still just idle */
+      CHECK(c.engaged);
+    }
+    /* the escape only matters while engaged; kill still wins even mid-hold */
+    { cruise_t c = {0};
+      cruise_step(&c, true, 120, 0);
+      cruise_step(&c, false, 0, 0);
+      cruise_step(&c, false, 0, 1000); /* mid-hold */
+      c.kill = true;
+      CHECK(cruise_step(&c, false, 0, 1500) == 0);
+      CHECK(!c.engaged);
     }
 
     /* --- kill debounce: must persist KILL_DEBOUNCE_MS before confirming --- */

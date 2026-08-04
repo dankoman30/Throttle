@@ -28,9 +28,24 @@
 
 /* Cruise control (resolved on the HANDLE; see handle_firmware.c).
  * Cruise freezes the transmitted throttle at the value captured when engaged.
- * It disengages on: a second cruise-button press, kill, or the trigger moving
- * more than CRUISE_DISENGAGE_THROTTLE_DELTA away from the frozen setpoint. */
+ * It disengages on: a second cruise-button press, kill, the trigger moving
+ * more than CRUISE_DISENGAGE_THROTTLE_DELTA above the frozen setpoint, or the
+ * idle-then-retake escape below (trigger held at/below
+ * CRUISE_REARM_THROTTLE_THRESHOLD for CRUISE_IDLE_REARM_DELAY_MS, then moved
+ * back above that same threshold). */
 #define CRUISE_DISENGAGE_THROTTLE_DELTA  10  /* 0-255 units; trigger move beyond this drops cruise */
+
+#define CRUISE_REARM_THROTTLE_THRESHOLD  8   /* 0-255 units. Used both ways: throttle must be AT/BELOW this to
+                                                 count as "neutral" and start the idle-hold timer below, and must
+                                                 go ABOVE this afterward to actually cancel cruise. Deliberately the
+                                                 same value both directions - the hold timer can only ever complete
+                                                 while throttle is at/below it, so becoming armed can never by
+                                                 itself trigger the cancel; it always takes a genuine new move. */
+#define CRUISE_IDLE_REARM_DELAY_MS       2000 /* how long the trigger must sit continuously at/below
+                                                  CRUISE_REARM_THROTTLE_THRESHOLD (with cruise engaged) before the
+                                                  next throttle input above that threshold cancels cruise. Any move
+                                                  back above the threshold during the wait resets this timer - it
+                                                  must be one continuous hold, not cumulative. */
 
 #pragma pack(push, 1)
 typedef struct {

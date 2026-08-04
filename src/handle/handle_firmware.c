@@ -72,6 +72,12 @@ static bool      g_cruise_engaged = false;
 static uint8_t   g_cruise_setpoint = 0;
 static bool      g_cruise_button_last = false;
 
+/* Idle-then-retake escape state (see apply_cruise). Only meaningful while
+ * g_cruise_engaged; reset whenever cruise is not engaged. */
+static bool      g_cruise_idle_last = false;    /* was throttle at/below the rearm threshold last tick */
+static uint32_t  g_cruise_idle_since_ms = 0;     /* when throttle most recently arrived at/below it */
+static bool      g_cruise_idle_rearmed = false;  /* continuous hold satisfied; next real move cancels cruise */
+
 /* Debounce state for the cruise button and the two accessory inputs. */
 static debounce_t g_cruise_btn_db;
 static debounce_t g_aux1_db;
@@ -188,12 +194,27 @@ static bool read_aux2_switch(void) { /* e.g. smoke: closed = on */
  *   - Engaging captures the current trigger position as the setpoint; while
  *     engaged we transmit that frozen value instead of the live trigger, so
  *     the pilot can release the trigger and the throttle holds.
- *   - Cruise drops on: kill (always), a second button press, or the pilot
- *     pulling the trigger ABOVE the setpoint by more than
- *     CRUISE_DISENGAGE_THROTTLE_DELTA (an override to take manual control /
- *     accelerate). Releasing the trigger BELOW the setpoint is exactly what
- *     cruise is for and does NOT disengage - that's how the pilot rests their
- *     hand. To reduce throttle, press the cruise button or kill.
+ *   - Cruise drops on any of three independent paths:
+ *       1. kill (always), or a second button press.
+ *       2. the pilot pulling the trigger ABOVE the setpoint by more than
+ *          CRUISE_DISENGAGE_THROTTLE_DELTA (an override to take manual
+ *          control / accelerate).
+ *       3. idle-then-retake: the trigger held continuously at/below
+ *          CRUISE_REARM_THROTTLE_THRESHOLD for CRUISE_IDLE_REARM_DELAY_MS,
+ *          followed by any move back above that threshold. Lets the pilot
+ *          simply let go and retake the trigger to get manual control back,
+ *          without pulling past the setpoint or hunting for the cruise
+ *          button. The 2s continuous-hold requirement (any dip back above
+ *          the threshold during the wait resets it) distinguishes a
+ *          deliberate release from a brief dip, and reusing the same
+ *          threshold both directions means the hold timer can only ever
+ *          finish while throttle is still at/below it - so becoming armed
+ *          can never by itself trigger the cancel, only a genuine
+ *          subsequent move can.
+ *     Merely releasing the trigger below the setpoint and holding it there
+ *     indefinitely is exactly what cruise is for and does NOT disengage on
+ *     its own - path 3 only fires on the pilot's next actual input after the
+ *     hold, not from resting at idle.
  * Returns the throttle value that should actually be transmitted this packet.
  * Kill must be evaluated (g_kill_latched set) BEFORE calling this. */
 static uint8_t apply_cruise(uint8_t live_throttle, uint32_t now) {
@@ -221,6 +242,27 @@ static uint8_t apply_cruise(uint8_t live_throttle, uint32_t now) {
         if ((int)live_throttle > (int)g_cruise_setpoint + CRUISE_DISENGAGE_THROTTLE_DELTA) {
             g_cruise_engaged = false;       /* pilot pulled past hold point -> manual */
         }
+    }
+
+    if (g_cruise_engaged) {
+        bool idle_now = live_throttle <= CRUISE_REARM_THROTTLE_THRESHOLD;
+        if (idle_now && !g_cruise_idle_last) {
+            g_cruise_idle_since_ms = now;   /* just arrived at neutral - (re)start the hold timer */
+            g_cruise_idle_rearmed = false;
+        }
+        g_cruise_idle_last = idle_now;
+
+        if (idle_now && !g_cruise_idle_rearmed &&
+            (now - g_cruise_idle_since_ms) >= CRUISE_IDLE_REARM_DELAY_MS) {
+            g_cruise_idle_rearmed = true;
+        }
+
+        if (g_cruise_idle_rearmed && !idle_now) {
+            g_cruise_engaged = false;       /* pilot retook the trigger -> manual */
+        }
+    } else {
+        g_cruise_idle_last = false;
+        g_cruise_idle_rearmed = false;
     }
 
     return g_cruise_engaged ? g_cruise_setpoint : live_throttle;
