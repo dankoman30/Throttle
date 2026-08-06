@@ -21,15 +21,10 @@
 #define BRINGUP_RF_CHANNEL  76u
 static const uint8_t BRINGUP_ADDR[5] = { 0xE7, 0xE7, 0xE7, 0xE7, 0xE7 };
 
-/* Matches throttle_packet_t's size in src/common/throttle_protocol.h.
- * Hardcoded here rather than including that header directly - this bring-up
- * project is deliberately decoupled from the real protocol contract until
- * the "wire real radio.* calls into handle_firmware.c/receiver_firmware.c"
- * step in DEVELOPMENT/radio/README.md's bring-up order. */
-#define BRINGUP_PACKET_SIZE  5u
-
 static void csn_low(void)  { HAL_GPIO_WritePin(NRF_CSN_GPIO_Port, NRF_CSN_Pin, GPIO_PIN_RESET); }
 static void csn_high(void) { HAL_GPIO_WritePin(NRF_CSN_GPIO_Port, NRF_CSN_Pin, GPIO_PIN_SET); }
+static void ce_low(void)   { HAL_GPIO_WritePin(NRF_CE_GPIO_Port, NRF_CE_Pin, GPIO_PIN_RESET); }
+static void ce_high(void)  { HAL_GPIO_WritePin(NRF_CE_GPIO_Port, NRF_CE_Pin, GPIO_PIN_SET); }
 
 uint8_t nrf24_read_reg(uint8_t reg) {
     uint8_t tx[2] = { (uint8_t)(NRF24_CMD_R_REGISTER | (reg & 0x1Fu)), 0xFFu };
@@ -82,7 +77,7 @@ void nrf24_write_reg_n(uint8_t reg, const uint8_t *buf, uint8_t len) {
 }
 
 void nrf24_init(void) {
-    HAL_GPIO_WritePin(NRF_CE_GPIO_Port, NRF_CE_Pin, GPIO_PIN_RESET); /* standby, not TX/RX yet */
+    ce_low(); /* standby, not TX/RX yet */
     csn_high();
     HAL_Delay(100); /* let the module's power-on settle */
 
@@ -96,11 +91,65 @@ void nrf24_init(void) {
     nrf24_write_reg(NRF24_REG_RF_SETUP, RF_SETUP_250KBPS_PA_HIGH);
     nrf24_write_reg_n(NRF24_REG_RX_ADDR_P0, BRINGUP_ADDR, 5);
     nrf24_write_reg_n(NRF24_REG_TX_ADDR, BRINGUP_ADDR, 5);
-    nrf24_write_reg(NRF24_REG_RX_PW_P0, BRINGUP_PACKET_SIZE);
+    nrf24_write_reg(NRF24_REG_RX_PW_P0, NRF24_PAYLOAD_SIZE);
 
-    /* PRIM_RX left 0 (PTX) for now - this bring-up step only proves
-     * register read/write through the driver, not actual TX/RX (CE stays
-     * low throughout). Role assignment happens in the two-board test. */
+    /* PRIM_RX left 0 (PTX) - matches nrf24_enter_tx_mode()'s state, so a
+     * TX-role board needs no further mode call. An RX-role board switches
+     * via nrf24_enter_rx_mode() after this. */
     nrf24_write_reg(NRF24_REG_CONFIG, NRF24_CONFIG_EN_CRC | NRF24_CONFIG_PWR_UP);
     HAL_Delay(2); /* Tpd2stby: power-down -> standby-I, max 1.5ms per datasheet Table 16 */
+}
+
+void nrf24_enter_tx_mode(void) {
+    ce_low();
+    uint8_t cfg = nrf24_read_reg(NRF24_REG_CONFIG);
+    nrf24_write_reg(NRF24_REG_CONFIG, cfg & (uint8_t)~NRF24_CONFIG_PRIM_RX);
+}
+
+void nrf24_enter_rx_mode(void) {
+    ce_low();
+    uint8_t cfg = nrf24_read_reg(NRF24_REG_CONFIG);
+    nrf24_write_reg(NRF24_REG_CONFIG, cfg | NRF24_CONFIG_PRIM_RX);
+    ce_high();
+    HAL_Delay(1); /* Tstby2a: standby -> RX settling, max 130us per datasheet Table 16 */
+}
+
+void nrf24_send_payload(const uint8_t *data, uint8_t len) {
+    uint8_t tx[1 + NRF24_MAX_MULTIBYTE_LEN];
+    uint8_t rx[1 + NRF24_MAX_MULTIBYTE_LEN];
+    tx[0] = NRF24_CMD_W_TX_PAYLOAD;
+    for (uint8_t i = 0; i < len; i++) {
+        tx[1 + i] = data[i];
+    }
+    csn_low();
+    HAL_SPI_TransmitReceive(&hspi1, tx, rx, (uint16_t)(1 + len), 100);
+    csn_high();
+
+    /* Pulse CE >= 10us (Thce) to start transmission; the chip completes the
+     * send autonomously even after CE returns low. HAL_Delay's 1ms floor is
+     * far more than needed but harmless at this test's slow send rate. */
+    ce_high();
+    HAL_Delay(1);
+    ce_low();
+}
+
+uint8_t nrf24_rx_available(void) {
+    uint8_t fifo_status = nrf24_read_reg(NRF24_REG_FIFO_STATUS);
+    return (fifo_status & NRF24_FIFO_STATUS_RX_EMPTY) ? 0u : 1u;
+}
+
+void nrf24_read_payload(uint8_t *data, uint8_t len) {
+    uint8_t tx[1 + NRF24_MAX_MULTIBYTE_LEN];
+    uint8_t rx[1 + NRF24_MAX_MULTIBYTE_LEN];
+    tx[0] = NRF24_CMD_R_RX_PAYLOAD;
+    for (uint8_t i = 0; i < len; i++) {
+        tx[1 + i] = 0xFFu;
+    }
+    csn_low();
+    HAL_SPI_TransmitReceive(&hspi1, tx, rx, (uint16_t)(1 + len), 100);
+    csn_high();
+    for (uint8_t i = 0; i < len; i++) {
+        data[i] = rx[1 + i];
+    }
+    nrf24_write_reg(NRF24_REG_STATUS, NRF24_STATUS_RX_DR); /* write-1-to-clear */
 }

@@ -35,6 +35,15 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
+/* Two-board TX/RX smoke test (DEVELOPMENT/radio/README.md bring-up step 3).
+ * Set to 1, build, and flash the first ("TX") board - it sends an
+ * incrementing counter every ~300ms. Set to 0, rebuild, and flash the
+ * second ("RX") board - it listens and stores each received counter in
+ * rx_last_counter / rx_packet_count, inspectable via a debugger breakpoint
+ * on the line noted below. Only flash/debug one board at a time; let the
+ * other free-run on USB power without an attached debug session. */
+#define BRINGUP_ROLE_TX 1
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -105,6 +114,15 @@ int main(void)
   uint8_t rx_addr_p0[5]  = { 0 };
   nrf24_read_reg_n(NRF24_REG_RX_ADDR_P0, rx_addr_p0, 5);
 
+#if BRINGUP_ROLE_TX
+  uint8_t tx_counter = 0;
+  /* nrf24_init() already leaves the chip in TX mode (PRIM_RX=0, CE low). */
+#else
+  uint32_t rx_packet_count = 0;
+  uint8_t rx_last_counter = 0;
+  nrf24_enter_rx_mode();
+#endif
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -114,6 +132,19 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+#if BRINGUP_ROLE_TX
+    uint8_t payload[NRF24_PAYLOAD_SIZE] = { tx_counter, tx_counter, tx_counter, tx_counter, tx_counter };
+    nrf24_send_payload(payload, NRF24_PAYLOAD_SIZE);
+    tx_counter++;
+    HAL_Delay(300);
+#else
+    if (nrf24_rx_available()) {
+      uint8_t payload[NRF24_PAYLOAD_SIZE];
+      nrf24_read_payload(payload, NRF24_PAYLOAD_SIZE);
+      rx_last_counter = payload[0];
+      rx_packet_count++; /* breakpoint here; expect rx_last_counter to climb by 1 each stop */
+    }
+#endif
   }
   /* USER CODE END 3 */
 }

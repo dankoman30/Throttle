@@ -45,16 +45,53 @@
 /* --- FIFO_STATUS register bits --- */
 #define NRF24_FIFO_STATUS_RX_EMPTY (1u << 0)
 
+/* --- STATUS register bits --- */
+#define NRF24_STATUS_RX_DR     (1u << 6)
+
+/* Fixed payload size this project's link uses (matches RX_PW_P0, written by
+ * nrf24_init()). Public so callers can size their TX/RX buffers. Matches
+ * throttle_packet_t's size in src/common/throttle_protocol.h; hardcoded
+ * here rather than including that header directly - this bring-up project
+ * is deliberately decoupled from the real protocol contract until the
+ * "wire real radio.* calls into handle_firmware.c/receiver_firmware.c" step
+ * in DEVELOPMENT/radio/README.md's bring-up order. */
+#define NRF24_PAYLOAD_SIZE     5u
+
 /* Configures the chip for this project's link: EN_AA=0x00 (no radio-level
  * ack, ADR 0001), no retries, 250kbps + PA_HIGH (-6dBm), a fixed 5-byte
  * static payload on pipe 0, matching TX_ADDR/RX_ADDR_P0. Leaves the chip in
- * standby-I with CE low (not yet transmitting or receiving) - raising CE is
- * a separate step once TX/RX roles are assigned in the two-board test. */
+ * standby-I with CE low, PRIM_RX=0 (PTX) - the same state
+ * nrf24_enter_tx_mode() puts it in, so a TX-role board needs no further
+ * mode call before nrf24_send_payload(). An RX-role board must call
+ * nrf24_enter_rx_mode() before nrf24_rx_available()/nrf24_read_payload(). */
 void nrf24_init(void);
 
 uint8_t nrf24_read_reg(uint8_t reg);
 void nrf24_write_reg(uint8_t reg, uint8_t value);
 void nrf24_read_reg_n(uint8_t reg, uint8_t *buf, uint8_t len);
 void nrf24_write_reg_n(uint8_t reg, const uint8_t *buf, uint8_t len);
+
+/* Standby-I as PTX: CE low, CONFIG PRIM_RX=0. Only needed if the chip was
+ * previously switched to RX mode - nrf24_init() already leaves it here. */
+void nrf24_enter_tx_mode(void);
+
+/* RX Mode: CONFIG PRIM_RX=1 (written while CE is still low, i.e. still in
+ * standby, per the "register writes only in power-down/standby" rule), then
+ * CE raised high so the chip continuously listens. */
+void nrf24_enter_rx_mode(void);
+
+/* Writes len bytes to the TX FIFO (W_TX_PAYLOAD) and pulses CE to start
+ * transmission. Call only in TX mode. Blocks for the CE pulse width, not
+ * for the transmission itself - the chip finishes the send autonomously
+ * after CE returns low. */
+void nrf24_send_payload(const uint8_t *data, uint8_t len);
+
+/* True if the RX FIFO has a packet waiting (FIFO_STATUS RX_EMPTY == 0).
+ * Call only in RX mode. */
+uint8_t nrf24_rx_available(void);
+
+/* Reads len bytes from the RX FIFO (R_RX_PAYLOAD) and clears STATUS.RX_DR.
+ * Call only after nrf24_rx_available() returns true. */
+void nrf24_read_payload(uint8_t *data, uint8_t len);
 
 #endif /* NRF24_H */
