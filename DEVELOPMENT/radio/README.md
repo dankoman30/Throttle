@@ -1,13 +1,8 @@
 # DEVELOPMENT/radio — RF24 HAL port & radio link bring-up
 
-**Status: logic analyzer + both capacitor kits have arrived; still waiting on
-the nRF24L01+PA+LNA modules and the 2 spare Nucleo boards. Nothing built
-yet.** The real bring-up needs the still-missing items, but one thing is
-worth doing now: a PulseView smoke test to confirm the logic analyzer is
-recognized and capturing (see item 4 below) — cheap to knock out early
-rather than discover an issue with it mid-bring-up later. This doc exists so
-picking this up once everything's in doesn't require re-deriving context
-from scratch.
+**Status: all hardware has arrived (2026-08-06). Nothing built yet — starting
+bring-up now.** This doc exists so picking this up doesn't require
+re-deriving context from scratch.
 
 ## What this covers
 
@@ -21,7 +16,7 @@ gone over the air yet. `docs/OPEN-ITEMS.md` flags the RF24 HAL port as staying
 
 ## Hardware inventory
 
-**Still in transit:**
+**All arrived:**
 1. **4x nRF24L01+PA+LNA modules**, from [Addicore](https://www.addicore.com/products/nrf24l01-pa-lna-with-antenna-2-4ghz-wireless-transceiver)
    (2 for the link + 2 spares). Clone chips (silkscreened as genuine Nordic
    but actually `SI24R1`/Beken parts) are a known problem for this exact
@@ -35,8 +30,6 @@ gone over the air yet. `docs/OPEN-ITEMS.md` flags the RF24 HAL port as staying
    existing board and both new ones are stock/unmodified. See the SPI pin
    mapping note below before wiring any of the three unmodified boards for
    radio — it's directly relevant.
-
-**Arrived:**
 3. **Decoupling capacitors**, from Amazon:
    - ALLECIN 24-value electrolytic capacitor assortment kit (0.1µF–1000µF,
      10V/16V/25V/50V). Use the **16V or 25V** parts for this (not the 10V
