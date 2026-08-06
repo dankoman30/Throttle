@@ -20,6 +20,7 @@
 #include "main.h"
 #include "spi.h"
 #include "gpio.h"
+#include "nrf24.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -90,21 +91,21 @@ int main(void)
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
 
-  /* nRF24L01+ SPI bring-up smoke test: read back the CONFIG register (addr
-   * 0x00) via the R_REGISTER command (command byte = 0x00 for this addr).
-   * Datasheet power-on-reset default for CONFIG is 0x08 on an unconfigured
-   * module. The STATUS register (~0x0E fresh) rides along in rx_buf[0] on
-   * every command as a free second check. */
-  uint8_t tx_buf[2] = { 0x00, 0xFF };
-  uint8_t rx_buf[2] = { 0, 0 };
+  /* nRF24L01+ driver smoke test: nrf24_init() configures EN_AA, SETUP_RETR,
+   * RF_CH, RF_SETUP, RX_ADDR_P0/TX_ADDR, and RX_PW_P0, then raises PWR_UP.
+   * Read three things back afterward to confirm both the read AND write
+   * paths work (stronger than the earlier raw-register test, which only
+   * proved reads against power-on-reset defaults):
+   *   - CONFIG:   expect 0x0A (EN_CRC=1, PWR_UP=1, PRIM_RX=0) - our own write.
+   *   - RF_SETUP: expect 0x24 (250kbps, PA_HIGH/-6dBm) - our own write.
+   *   - RX_ADDR_P0 (5 bytes): expect {0xE7,0xE7,0xE7,0xE7,0xE7} - confirms
+   *     multi-byte register writes/reads work too, not just single-byte. */
+  nrf24_init();
 
-  HAL_GPIO_WritePin(NRF_CE_GPIO_Port, NRF_CE_Pin, GPIO_PIN_RESET);   /* standby */
-  HAL_GPIO_WritePin(NRF_CSN_GPIO_Port, NRF_CSN_Pin, GPIO_PIN_SET);   /* idle high */
-  HAL_Delay(100); /* let the module's power-on settle */
-
-  HAL_GPIO_WritePin(NRF_CSN_GPIO_Port, NRF_CSN_Pin, GPIO_PIN_RESET); /* begin transaction */
-  HAL_SPI_TransmitReceive(&hspi1, tx_buf, rx_buf, 2, 100);
-  HAL_GPIO_WritePin(NRF_CSN_GPIO_Port, NRF_CSN_Pin, GPIO_PIN_SET);   /* end transaction */
+  uint8_t config_val    = nrf24_read_reg(NRF24_REG_CONFIG);
+  uint8_t rf_setup_val   = nrf24_read_reg(NRF24_REG_RF_SETUP);
+  uint8_t rx_addr_p0[5]  = { 0 };
+  nrf24_read_reg_n(NRF24_REG_RX_ADDR_P0, rx_addr_p0, 5);
 
   /* USER CODE END 2 */
 

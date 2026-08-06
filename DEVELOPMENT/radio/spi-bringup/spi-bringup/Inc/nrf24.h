@@ -1,0 +1,60 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Copyright (C) 2026 Daniel Koman */
+/* ---------------------------------------------------------------------
+ * Minimal nRF24L01+ register-level driver.
+ *
+ * Implements only what this project's link actually needs: fixed 5-byte
+ * payloads, one pipe, no auto-ack, no dynamic payload, poll-based
+ * available()/read() (no IRQ pin wired). All command bytes and register
+ * addresses below are verified against the nRF24L01+ Product Specification
+ * v1.0 (DEVELOPMENT/assets/nRF24L01+/nRF24L01P_Product_Specification_1_0.pdf),
+ * not the older non-Plus nRF24L01 datasheet (the two differ in RF_SETUP's
+ * bit layout for the 250kbps data rate).
+ * ------------------------------------------------------------------- */
+#ifndef NRF24_H
+#define NRF24_H
+
+#include <stdint.h>
+
+/* --- SPI command bytes (datasheet Table 20) --- */
+#define NRF24_CMD_R_REGISTER   0x00u /* OR with a 5-bit register address */
+#define NRF24_CMD_W_REGISTER   0x20u /* OR with a 5-bit register address; power-down/standby only */
+#define NRF24_CMD_R_RX_PAYLOAD 0x61u
+#define NRF24_CMD_W_TX_PAYLOAD 0xA0u
+#define NRF24_CMD_FLUSH_TX     0xE1u
+#define NRF24_CMD_FLUSH_RX     0xE2u
+#define NRF24_CMD_NOP          0xFFu
+
+/* --- Register addresses actually used (datasheet Table 28) --- */
+#define NRF24_REG_CONFIG       0x00u
+#define NRF24_REG_EN_AA        0x01u
+#define NRF24_REG_SETUP_RETR   0x04u
+#define NRF24_REG_RF_CH        0x05u
+#define NRF24_REG_RF_SETUP     0x06u
+#define NRF24_REG_STATUS       0x07u
+#define NRF24_REG_RX_ADDR_P0   0x0Au
+#define NRF24_REG_TX_ADDR      0x10u
+#define NRF24_REG_RX_PW_P0     0x11u
+#define NRF24_REG_FIFO_STATUS  0x17u
+
+/* --- CONFIG register bits --- */
+#define NRF24_CONFIG_EN_CRC    (1u << 3)
+#define NRF24_CONFIG_PWR_UP    (1u << 1)
+#define NRF24_CONFIG_PRIM_RX   (1u << 0)
+
+/* --- FIFO_STATUS register bits --- */
+#define NRF24_FIFO_STATUS_RX_EMPTY (1u << 0)
+
+/* Configures the chip for this project's link: EN_AA=0x00 (no radio-level
+ * ack, ADR 0001), no retries, 250kbps + PA_HIGH (-6dBm), a fixed 5-byte
+ * static payload on pipe 0, matching TX_ADDR/RX_ADDR_P0. Leaves the chip in
+ * standby-I with CE low (not yet transmitting or receiving) - raising CE is
+ * a separate step once TX/RX roles are assigned in the two-board test. */
+void nrf24_init(void);
+
+uint8_t nrf24_read_reg(uint8_t reg);
+void nrf24_write_reg(uint8_t reg, uint8_t value);
+void nrf24_read_reg_n(uint8_t reg, uint8_t *buf, uint8_t len);
+void nrf24_write_reg_n(uint8_t reg, const uint8_t *buf, uint8_t len);
+
+#endif /* NRF24_H */
