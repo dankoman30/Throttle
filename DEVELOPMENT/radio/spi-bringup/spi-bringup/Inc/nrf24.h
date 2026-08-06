@@ -44,6 +44,7 @@
 
 /* --- FIFO_STATUS register bits --- */
 #define NRF24_FIFO_STATUS_RX_EMPTY (1u << 0)
+#define NRF24_FIFO_STATUS_TX_EMPTY (1u << 4)
 
 /* --- STATUS register bits --- */
 #define NRF24_STATUS_RX_DR     (1u << 6)

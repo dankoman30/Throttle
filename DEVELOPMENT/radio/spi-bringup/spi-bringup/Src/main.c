@@ -42,7 +42,7 @@
  * rx_last_counter / rx_packet_count, inspectable via a debugger breakpoint
  * on the line noted below. Only flash/debug one board at a time; let the
  * other free-run on USB power without an attached debug session. */
-#define BRINGUP_ROLE_TX 1
+#define BRINGUP_ROLE_TX 0
 
 /* USER CODE END PD */
 
@@ -135,7 +135,8 @@ int main(void)
 #if BRINGUP_ROLE_TX
     uint8_t payload[NRF24_PAYLOAD_SIZE] = { tx_counter, tx_counter, tx_counter, tx_counter, tx_counter };
     nrf24_send_payload(payload, NRF24_PAYLOAD_SIZE);
-    tx_counter++;
+    uint8_t tx_fifo_status = nrf24_read_reg(NRF24_REG_FIFO_STATUS);
+    tx_counter++; /* breakpoint here; tx_fifo_status should have TX_EMPTY (0x10) set after each send */
     HAL_Delay(300);
 #else
     if (nrf24_rx_available()) {
