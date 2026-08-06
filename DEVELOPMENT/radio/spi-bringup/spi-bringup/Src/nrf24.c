@@ -49,29 +49,38 @@ void nrf24_write_reg(uint8_t reg, uint8_t value) {
 }
 
 /* Multi-byte registers (e.g. RX_ADDR_P0, TX_ADDR) are LSByte first per the
- * datasheet's SPI command format. */
+ * datasheet's SPI command format. Built as one cmd+data buffer and sent in a
+ * single HAL_SPI_TransmitReceive call (matching nrf24_read_reg/write_reg)
+ * rather than one call per byte - back-to-back blocking calls under one
+ * csn_low()/csn_high() bracket were unreliable in practice (bring-up board
+ * read RX_ADDR_P0 back as all zero, not even the chip's own 0xE7 reset
+ * default, after this was split into per-byte calls). */
+#define NRF24_MAX_MULTIBYTE_LEN 5u /* max real use: 5-byte address registers */
+
 void nrf24_read_reg_n(uint8_t reg, uint8_t *buf, uint8_t len) {
-    uint8_t cmd = (uint8_t)(NRF24_CMD_R_REGISTER | (reg & 0x1Fu));
-    uint8_t status;
-    csn_low();
-    HAL_SPI_TransmitReceive(&hspi1, &cmd, &status, 1, 100);
+    uint8_t tx[1 + NRF24_MAX_MULTIBYTE_LEN];
+    uint8_t rx[1 + NRF24_MAX_MULTIBYTE_LEN];
+    tx[0] = (uint8_t)(NRF24_CMD_R_REGISTER | (reg & 0x1Fu));
     for (uint8_t i = 0; i < len; i++) {
-        uint8_t tx = 0xFFu, rxb = 0;
-        HAL_SPI_TransmitReceive(&hspi1, &tx, &rxb, 1, 100);
-        buf[i] = rxb;
+        tx[1 + i] = 0xFFu;
     }
+    csn_low();
+    HAL_SPI_TransmitReceive(&hspi1, tx, rx, (uint16_t)(1 + len), 100);
     csn_high();
+    for (uint8_t i = 0; i < len; i++) {
+        buf[i] = rx[1 + i];
+    }
 }
 
 void nrf24_write_reg_n(uint8_t reg, const uint8_t *buf, uint8_t len) {
-    uint8_t cmd = (uint8_t)(NRF24_CMD_W_REGISTER | (reg & 0x1Fu));
-    uint8_t status;
-    csn_low();
-    HAL_SPI_TransmitReceive(&hspi1, &cmd, &status, 1, 100);
+    uint8_t tx[1 + NRF24_MAX_MULTIBYTE_LEN];
+    uint8_t rx[1 + NRF24_MAX_MULTIBYTE_LEN];
+    tx[0] = (uint8_t)(NRF24_CMD_W_REGISTER | (reg & 0x1Fu));
     for (uint8_t i = 0; i < len; i++) {
-        uint8_t tx = buf[i], rxb = 0;
-        HAL_SPI_TransmitReceive(&hspi1, &tx, &rxb, 1, 100);
+        tx[1 + i] = buf[i];
     }
+    csn_low();
+    HAL_SPI_TransmitReceive(&hspi1, tx, rx, (uint16_t)(1 + len), 100);
     csn_high();
 }
 
