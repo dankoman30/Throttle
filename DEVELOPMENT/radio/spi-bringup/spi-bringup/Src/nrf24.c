@@ -76,10 +76,35 @@ void nrf24_write_reg_n(uint8_t reg, const uint8_t *buf, uint8_t len) {
     csn_high();
 }
 
+void nrf24_flush_tx(void) {
+    uint8_t cmd = NRF24_CMD_FLUSH_TX;
+    uint8_t status;
+    csn_low();
+    HAL_SPI_TransmitReceive(&hspi1, &cmd, &status, 1, 100);
+    csn_high();
+}
+
+void nrf24_flush_rx(void) {
+    uint8_t cmd = NRF24_CMD_FLUSH_RX;
+    uint8_t status;
+    csn_low();
+    HAL_SPI_TransmitReceive(&hspi1, &cmd, &status, 1, 100);
+    csn_high();
+}
+
 void nrf24_init(void) {
     ce_low(); /* standby, not TX/RX yet */
     csn_high();
     HAL_Delay(100); /* let the module's power-on settle */
+
+    /* The chip's own power isn't tied to the MCU's reset/reflash cycle, so
+     * STATUS flags and FIFO contents from a previous run can still be
+     * sitting there. Per the datasheet, a latched MAX_RT blocks all further
+     * transmission until explicitly cleared - clear it (and TX_DS/RX_DR for
+     * good measure) and flush both FIFOs before doing anything else. */
+    nrf24_write_reg(NRF24_REG_STATUS, NRF24_STATUS_RX_DR | NRF24_STATUS_TX_DS | NRF24_STATUS_MAX_RT);
+    nrf24_flush_tx();
+    nrf24_flush_rx();
 
     /* All register writes below happen while PWR_UP is still 0 (the
      * post-reset power-down default) - W_REGISTER is only valid in

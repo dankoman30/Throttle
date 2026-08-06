@@ -48,6 +48,8 @@
 
 /* --- STATUS register bits --- */
 #define NRF24_STATUS_RX_DR     (1u << 6)
+#define NRF24_STATUS_TX_DS     (1u << 5)
+#define NRF24_STATUS_MAX_RT    (1u << 4)
 
 /* Fixed payload size this project's link uses (matches RX_PW_P0, written by
  * nrf24_init()). Public so callers can size their TX/RX buffers. Matches
@@ -71,6 +73,10 @@ uint8_t nrf24_read_reg(uint8_t reg);
 void nrf24_write_reg(uint8_t reg, uint8_t value);
 void nrf24_read_reg_n(uint8_t reg, uint8_t *buf, uint8_t len);
 void nrf24_write_reg_n(uint8_t reg, const uint8_t *buf, uint8_t len);
+
+/* FLUSH_TX / FLUSH_RX: discard the entire TX or RX FIFO. */
+void nrf24_flush_tx(void);
+void nrf24_flush_rx(void);
 
 /* Standby-I as PTX: CE low, CONFIG PRIM_RX=0. Only needed if the chip was
  * previously switched to RX mode - nrf24_init() already leaves it here. */
