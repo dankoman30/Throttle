@@ -134,6 +134,17 @@ or bumping to a Nucleo-64 — already noted as the fallback in
    read back a known register (e.g. `CONFIG`, datasheet default `0x08`) and
    confirm it matches. Logic analyzer on SCK/MOSI/MISO/CSN/CE to sanity-check
    the transaction shape against the datasheet timing diagrams.
+
+   **Done, 2026-08-06.** `DEVELOPMENT/radio/spi-bringup/` (stock/unmodified
+   Nucleo, SPI1 on PB3/PB4/PB5) read back `CONFIG` (addr `0x00`) as `0x08`
+   and `STATUS` as `0x0E` — both exactly the nRF24L01+ datasheet's
+   power-on-reset defaults for a fresh module. Confirmed via CubeIDE
+   debugger (breakpoint after the transaction, `rx_buf[0]`/`rx_buf[1]`
+   inspected as Expressions), not yet cross-checked against the logic
+   analyzer's captured waveform — worth doing at some point for the
+   SPI-mode/timing sanity check, but not blocking since the chip is already
+   responding with correct data.
+
 2. Decide fork-vs-custom-driver (above) once SPI is proven solid.
 3. **Two boards + two modules**: a raw TX/RX smoke test independent of
    `handle_firmware.c`/`receiver_firmware.c` — e.g. one side sends an
