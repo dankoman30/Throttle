@@ -93,12 +93,10 @@ int main(void)
 
   /* nRF24L01+ driver smoke test: nrf24_init() configures EN_AA, SETUP_RETR,
    * RF_CH, RF_SETUP, RX_ADDR_P0/TX_ADDR, and RX_PW_P0, then raises PWR_UP.
-   * Read three things back afterward to confirm both the read AND write
-   * paths work (stronger than the earlier raw-register test, which only
-   * proved reads against power-on-reset defaults):
-   *   - CONFIG:   expect 0x0A (EN_CRC=1, PWR_UP=1, PRIM_RX=0) - our own write.
-   *   - RF_SETUP: expect 0x24 (250kbps, PA_HIGH/-6dBm) - our own write.
-   *   - RX_ADDR_P0 (5 bytes): expect {0xE7,0xE7,0xE7,0xE7,0xE7} - confirms
+   * Confirmed on hardware, 2026-08-06 (see DEVELOPMENT/radio/README.md):
+   *   - CONFIG:   0x0A (EN_CRC=1, PWR_UP=1, PRIM_RX=0) - our own write.
+   *   - RF_SETUP: 0x24 (250kbps, PA_HIGH/-6dBm) - our own write.
+   *   - RX_ADDR_P0 (5 bytes): {0xE7,0xE7,0xE7,0xE7,0xE7} - confirms
    *     multi-byte register writes/reads work too, not just single-byte. */
   nrf24_init();
 

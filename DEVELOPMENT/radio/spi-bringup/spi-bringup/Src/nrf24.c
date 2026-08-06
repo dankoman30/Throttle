@@ -50,24 +50,9 @@ void nrf24_write_reg(uint8_t reg, uint8_t value) {
 
 /* Multi-byte registers (e.g. RX_ADDR_P0, TX_ADDR) are LSByte first per the
  * datasheet's SPI command format. Built as one cmd+data buffer and sent in a
- * single HAL_SPI_TransmitReceive call (matching nrf24_read_reg/write_reg)
- * rather than one call per byte - back-to-back blocking calls under one
- * csn_low()/csn_high() bracket were unreliable in practice (bring-up board
- * read RX_ADDR_P0 back as all zero, not even the chip's own 0xE7 reset
- * default, after this was split into per-byte calls). */
+ * single HAL_SPI_TransmitReceive call (matching nrf24_read_reg/write_reg),
+ * confirmed against real hardware - see DEVELOPMENT/radio/README.md. */
 #define NRF24_MAX_MULTIBYTE_LEN 5u /* max real use: 5-byte address registers */
-
-/* Temporary bring-up diagnostics: inspect these two in the debugger
- * Expressions view after stepping over a _n call. HAL_OK == 0; anything
- * else means the SPI transfer itself errored/timed out. *_status_byte is
- * rx[0] from that same transfer, i.e. the STATUS register the chip always
- * shifts back while clocking in the command byte - a sane-looking value
- * (not 0x00/0xFF) there means the chip is responding at all. Remove once
- * the multi-byte path is confirmed working. */
-volatile HAL_StatusTypeDef nrf24_dbg_last_read_status;
-volatile uint8_t nrf24_dbg_last_read_status_byte;
-volatile HAL_StatusTypeDef nrf24_dbg_last_write_status;
-volatile uint8_t nrf24_dbg_last_write_status_byte;
 
 void nrf24_read_reg_n(uint8_t reg, uint8_t *buf, uint8_t len) {
     uint8_t tx[1 + NRF24_MAX_MULTIBYTE_LEN];
@@ -77,9 +62,8 @@ void nrf24_read_reg_n(uint8_t reg, uint8_t *buf, uint8_t len) {
         tx[1 + i] = 0xFFu;
     }
     csn_low();
-    nrf24_dbg_last_read_status = HAL_SPI_TransmitReceive(&hspi1, tx, rx, (uint16_t)(1 + len), 100);
+    HAL_SPI_TransmitReceive(&hspi1, tx, rx, (uint16_t)(1 + len), 100);
     csn_high();
-    nrf24_dbg_last_read_status_byte = rx[0];
     for (uint8_t i = 0; i < len; i++) {
         buf[i] = rx[1 + i];
     }
@@ -93,9 +77,8 @@ void nrf24_write_reg_n(uint8_t reg, const uint8_t *buf, uint8_t len) {
         tx[1 + i] = buf[i];
     }
     csn_low();
-    nrf24_dbg_last_write_status = HAL_SPI_TransmitReceive(&hspi1, tx, rx, (uint16_t)(1 + len), 100);
+    HAL_SPI_TransmitReceive(&hspi1, tx, rx, (uint16_t)(1 + len), 100);
     csn_high();
-    nrf24_dbg_last_write_status_byte = rx[0];
 }
 
 void nrf24_init(void) {

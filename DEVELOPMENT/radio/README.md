@@ -111,9 +111,13 @@ no dynamic payload, no multicast. That's plausibly *less* total code than
 untangling someone else's partial port, and easier to safety-review since
 it would only contain what's actually used.
 
-**Decide this once modules arrive and basic SPI register read-back is
-confirmed working** (see bring-up order below) — the choice doesn't change
-anything about the hardware or wiring either way.
+**Decided, 2026-08-06: minimal custom driver.** Implemented as
+`DEVELOPMENT/radio/spi-bringup/spi-bringup/{Inc,Src}/nrf24.c/.h` — a
+register-level driver against the nRF24L01+ (Plus) datasheet covering only
+what this project's link needs (single/multi-byte register read/write,
+init with no-ack/no-retry/250kbps+PA_HIGH/fixed 5-byte payload). Chosen over
+adapting TheDIYGuy999/RF24_STM32 or MarkKharkov/RF24 per the reasoning
+above and ADR 0006 (pure STM32 HAL, no Arduino/STM32duino).
 
 ## Known integration constraint for later: pin budget
 
@@ -145,7 +149,18 @@ or bumping to a Nucleo-64 — already noted as the fallback in
    SPI-mode/timing sanity check, but not blocking since the chip is already
    responding with correct data.
 
-2. Decide fork-vs-custom-driver (above) once SPI is proven solid.
+   **Multi-byte register read/write also confirmed, 2026-08-06.** The
+   `nrf24.c` driver's `nrf24_write_reg_n`/`nrf24_read_reg_n` (used for the
+   5-byte `RX_ADDR_P0`/`TX_ADDR` address registers) round-tripped correctly
+   on hardware: after `nrf24_init()`, `CONFIG` read back `0x0A`, `RF_SETUP`
+   read back `0x24`, and `RX_ADDR_P0` read back `{0xE7,0xE7,0xE7,0xE7,0xE7}`
+   — all matching the values the driver itself wrote, confirming both the
+   single- and multi-byte read and write paths. (An early single-call-per-byte
+   implementation of the `_n` functions read back all-zero instead; fixed by
+   building one cmd+data buffer and sending it in one `HAL_SPI_TransmitReceive`
+   call, matching the single-register functions' already-proven pattern.)
+
+2. ~~Decide fork-vs-custom-driver~~ — done, see above.
 3. **Two boards + two modules**: a raw TX/RX smoke test independent of
    `handle_firmware.c`/`receiver_firmware.c` — e.g. one side sends an
    incrementing counter, the other prints/blinks it. Proves the link itself
