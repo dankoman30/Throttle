@@ -42,7 +42,7 @@
  * rx_last_counter / rx_packet_count, inspectable via a debugger breakpoint
  * on the line noted below. Only flash/debug one board at a time; let the
  * other free-run on USB power without an attached debug session. */
-#define BRINGUP_ROLE_TX 1
+#define BRINGUP_ROLE_TX 0
 
 /* USER CODE END PD */
 
