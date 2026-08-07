@@ -101,15 +101,18 @@ before assuming that hardware behaves the same way.
 ## Consequences / follow-ups (tracked in OPEN-ITEMS.md)
 
 - Two distinct bench tests: (a) handle→receiver range through real body/frame
-  — **typical operating distance is ≤10 ft, but the target is reliable
-  operation out to 300 yards (900 ft)** as a stretch goal, per pilot
-  requirement; (b) **engine RPM sweep** logging consecutive-packet-loss vs
-  RPM with the receiver mounted in its real location.
-- The 300-yard target is a data point favoring 250kbps over 1Mbps once
-  genuine (non-clone) hardware is on hand to re-test it (see the 2026-08-06
-  addendum above) — 1Mbps's reduced receiver sensitivity is the kind of
-  margin loss that matters most exactly at this kind of range, on top of
-  the body/frame and engine EMI attenuation this ADR already covers.
+  — **typical operating distance is ≤10 ft, target range is up to 50 ft**,
+  per pilot requirement (revised 2026-08-06; an earlier 300-yard stretch
+  goal was floated and then explicitly dropped as not important right now);
+  (b) **engine RPM sweep** logging consecutive-packet-loss vs RPM with the
+  receiver mounted in its real location.
+- At a 50 ft target, `1Mbps`'s reduced receiver sensitivity vs `250kbps` is
+  much less likely to matter for range itself — the earlier note favoring
+  250kbps was written against the 300-yard goal and no longer carries the
+  same weight. Re-testing 250kbps on genuine (non-clone) hardware (see the
+  2026-08-06 addendum above) is still worthwhile due diligence since this
+  bring-up's hardware showed likely clone-chip symptoms, but it's no longer
+  urgent on range grounds alone.
 - Possible channel selection to dodge both WiFi and the engine's worst harmonic
   bands; scan on boot.
 - Low-priority: evaluate CRC8 → CRC16 given the hostile environment (packet
