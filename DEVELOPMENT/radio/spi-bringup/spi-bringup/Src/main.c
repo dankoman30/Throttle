@@ -42,7 +42,7 @@
  * rx_last_counter / rx_packet_count, inspectable via a debugger breakpoint
  * on the line noted below. Only flash/debug one board at a time; let the
  * other free-run on USB power without an attached debug session. */
-#define BRINGUP_ROLE_TX 0
+#define BRINGUP_ROLE_TX 1
 
 /* USER CODE END PD */
 
@@ -113,6 +113,12 @@ int main(void)
   uint8_t rf_setup_val   = nrf24_read_reg(NRF24_REG_RF_SETUP);
   uint8_t rx_addr_p0[5]  = { 0 };
   nrf24_read_reg_n(NRF24_REG_RX_ADDR_P0, rx_addr_p0, 5);
+  /* Never previously read back - checking these because MAX_RT (max
+   * retransmits) is showing up on the TX board despite EN_AA/SETUP_RETR
+   * both being written 0x00, which should make MAX_RT impossible. Expect
+   * both 0x00 here; if not, the writes aren't landing as intended. */
+  uint8_t en_aa_val      = nrf24_read_reg(NRF24_REG_EN_AA);
+  uint8_t setup_retr_val = nrf24_read_reg(NRF24_REG_SETUP_RETR);
 
 #if BRINGUP_ROLE_TX
   uint8_t tx_counter = 0;
