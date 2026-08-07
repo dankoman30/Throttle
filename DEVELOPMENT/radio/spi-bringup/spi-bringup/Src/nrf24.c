@@ -14,6 +14,16 @@
  * chip. */
 #define RF_SETUP_250KBPS_PA_HIGH  0x24u
 
+/* 1Mbps + PA_HIGH: RF_DR_LOW=0, RF_DR_HIGH=0 -> '00' = 1Mbps per the same
+ * encoding table. Temporary bring-up diagnostic - TX board confirms
+ * completed sends (TX_DS set) but the RX board never receives anything
+ * at 250kbps; multiple independent community reports describe 250kbps
+ * specifically as unreliable on nRF24L01/clone modules even when 1Mbps
+ * works fine on the same hardware. Not a decision on the real project's
+ * data rate (still open, see docs/decisions/0005-radio-choice-and-ignition-emi.md) -
+ * this only exists to isolate whether 250kbps itself is the fault. */
+#define RF_SETUP_1MBPS_PA_HIGH  0x06u
+
 /* Placeholder RF channel and address - NOT the final ADR 0005 channel
  * selection (still open, see docs/OPEN-ITEMS.md "Channel selection").
  * Only needs to match on both ends of the eventual two-board TX/RX smoke
@@ -113,7 +123,7 @@ void nrf24_init(void) {
     nrf24_write_reg(NRF24_REG_EN_AA, 0x00u);           /* no radio-level ack, ADR 0001 */
     nrf24_write_reg(NRF24_REG_SETUP_RETR, 0x00u);      /* no retries, matches no-ack */
     nrf24_write_reg(NRF24_REG_RF_CH, BRINGUP_RF_CHANNEL);
-    nrf24_write_reg(NRF24_REG_RF_SETUP, RF_SETUP_250KBPS_PA_HIGH);
+    nrf24_write_reg(NRF24_REG_RF_SETUP, RF_SETUP_1MBPS_PA_HIGH);
     nrf24_write_reg_n(NRF24_REG_RX_ADDR_P0, BRINGUP_ADDR, 5);
     nrf24_write_reg_n(NRF24_REG_TX_ADDR, BRINGUP_ADDR, 5);
     nrf24_write_reg(NRF24_REG_RX_PW_P0, NRF24_PAYLOAD_SIZE);
