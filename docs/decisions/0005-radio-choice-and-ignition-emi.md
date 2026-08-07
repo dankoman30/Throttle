@@ -70,6 +70,34 @@ engine**, the worst position relative to the source.
 7. Supply decoupling on the receiver STM32 rail (noise couples via power, not
    just the antenna).
 
+## Addendum, 2026-08-06 — clone symptoms observed on bring-up hardware
+
+The bring-up modules (4x nRF24L01+PA+LNA, bought from Addicore, not
+Mouser/DigiKey as this ADR specifies) showed behavior consistent with the
+clone caveat above during `DEVELOPMENT/radio/` two-board TX/RX bring-up:
+
+- The TX side latched a `MAX_RT` (max retransmits) fault on nearly every
+  send despite `EN_AA=0x00` and `SETUP_RETR=0x00` both confirmed via
+  register read-back — which should make `MAX_RT` unreachable on genuine
+  nRF24L01+ silicon. This matches a documented issue with the SI24R1 clone
+  (the chip most commonly found mislabeled as genuine on this module
+  category): inverted ACK-related bit behavior relative to the real part.
+  Worked around in the bring-up driver by clearing `STATUS` and flushing
+  the TX FIFO after every send, not just once at init.
+- `250kbps` produced zero successful receptions at close range even after
+  the above fix (TX confirmed completing sends via `STATUS.TX_DS`); simply
+  switching to `1Mbps` with no other change made reception work reliably.
+  Community reports describe 250kbps specifically as unreliable on various
+  nRF24L01/clone modules, consistent with this.
+
+Neither symptom proves these specific units are SI24R1 clones (no chip-ID
+readback was done), but both are exactly the failure signature the clone
+caveat above warned about. **Relevant for the eventual production sourcing
+decision**: if final units are bought from Mouser/DigiKey per this ADR's
+original guidance, re-run this same bring-up test (register read-back on
+`EN_AA`/`SETUP_RETR` matching intent, and a real reception test at 250kbps)
+before assuming that hardware behaves the same way.
+
 ## Consequences / follow-ups (tracked in OPEN-ITEMS.md)
 
 - Two distinct bench tests: (a) handle→receiver range through real body/frame;

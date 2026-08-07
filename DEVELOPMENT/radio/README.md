@@ -165,6 +165,25 @@ or bumping to a Nucleo-64 — already noted as the fallback in
    `handle_firmware.c`/`receiver_firmware.c` — e.g. one side sends an
    incrementing counter, the other prints/blinks it. Proves the link itself
    before touching either firmware.
+
+   **Done, 2026-08-06.** Board A (PTX role) sends an incrementing counter
+   every ~300ms; board B (PRX role) receives it and stores the value for
+   debugger inspection (`rx_last_counter`), confirmed climbing by 1 each
+   time, matching board A. Two real bugs found and fixed along the way —
+   see `docs/decisions/0005-radio-choice-and-ignition-emi.md`'s 2026-08-06
+   addendum for the full detail, since both are likely clone-chip symptoms
+   relevant to eventual production hardware sourcing:
+   - `nrf24_send_payload()` now clears `STATUS` and flushes the TX FIFO
+     after every send (not just once at init) — without this, the TX
+     board's FIFO latched permanently full (`MAX_RT` stuck set) within a
+     few send cycles, despite `EN_AA`/`SETUP_RETR` both confirmed `0x00`.
+   - `RF_SETUP` is temporarily `1Mbps` instead of the originally-intended
+     `250kbps` — at 250kbps, zero packets were ever received even with the
+     above fix and both boards side by side with antennas seated; switching
+     to 1Mbps with no other change made reception immediately reliable.
+     **This is a bring-up diagnostic swap, not a data-rate decision** — see
+     the ADR 0005 addendum before assuming it holds for other hardware.
+
 4. **Only after that**: wire the real `radio.*` calls into
    `handle_firmware.c` and `receiver_firmware.c` (currently fully
    commented-out stubs) and re-verify both bench rigs end-to-end over real
