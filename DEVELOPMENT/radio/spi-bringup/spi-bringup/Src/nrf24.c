@@ -156,6 +156,18 @@ void nrf24_send_payload(const uint8_t *data, uint8_t len) {
     ce_high();
     HAL_Delay(1);
     ce_low();
+
+    /* Workaround for a MAX_RT/TX_FULL lockup seen on hardware even with
+     * EN_AA=0x00 and SETUP_RETR=0x00 confirmed via register read-back
+     * (should make MAX_RT unreachable per the real nRF24L01+ datasheet).
+     * Matches a known issue with this module's likely clone silicon
+     * (SI24R1, flagged as a real risk for this exact PA+LNA module category
+     * in DEVELOPMENT/radio/README.md) having inverted ACK-related behavior.
+     * Clearing STATUS and flushing the TX FIFO after every send, not just
+     * once at init, stops a spurious MAX_RT on one send from permanently
+     * blocking every send after it. */
+    nrf24_write_reg(NRF24_REG_STATUS, NRF24_STATUS_RX_DR | NRF24_STATUS_TX_DS | NRF24_STATUS_MAX_RT);
+    nrf24_flush_tx();
 }
 
 uint8_t nrf24_rx_available(void) {
