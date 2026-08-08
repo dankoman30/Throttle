@@ -56,5 +56,23 @@ why this works.
   `step_toward_target()` path to the servo PWM. This is the first
   confirmed real-hardware run of the complete radio→validate→throttle→
   servo chain.
+- **2026-08-08: Stage 3 confirmed on real hardware — wireless KILL and
+  START, both correctly gated.** `spi-bringup`'s TX role now also
+  auto-tests `CMD_FLAG_START_REQ` (every ~6s, held ~0.9s at idle throttle,
+  well under `MAX_CRANK_MS` - always ends via voluntary release) and
+  supports a debugger-triggered one-shot `CMD_FLAG_KILL` (not automatic,
+  since KILL is sticky on the receiver and firing it on a timer would lock
+  board B mid-test). Confirmed: wireless START correctly cycles blue
+  (cranking) → green (engine-running proxy, stays lit - visible as an
+  amber/yellow tint against the still-blinking red heartbeat) → back to
+  normal; wireless KILL correctly latches solid red and stays there
+  through a real board-A debug-session interruption, requiring a genuine
+  board B power-cycle to re-arm (confirmed the local start button remains
+  independently functional after re-arm, and that the TX side's one-shot
+  `tx_send_kill` flag correctly self-resets). This is full real-hardware
+  confirmation of every command path this board handles - kill, start
+  (both wireless and local), and throttle - all currently deferred parts
+  (kill relay, starter relay, battery sense) are wiring gaps, not logic
+  gaps.
 - **Known, deliberate wiring gaps**: kill relay, starter relay, battery
   sense — see `docs/wiring.md` "Known gaps".
