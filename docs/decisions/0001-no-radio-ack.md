@@ -73,3 +73,14 @@ structurally-isolated feature — not part of first radio bring-up.**
   today's send-only handle radio) worth sizing before committing.
 - Deferred until after the primary control link (RF24 HAL port, both bench
   rigs radio-verified) is working. Tracked in `docs/OPEN-ITEMS.md`.
+
+### Addendum (2026-08-08): what the handle should show once telemetry exists
+
+Pilot requirement, recorded ahead of implementation: the handle's own display
+should show **both packs' battery level side by side** (its own, read
+locally as today; the receiver's, via telemetry once built) plus the
+**receiver's system status** (cranking / idle-armed / killed, mirroring
+`receiver_firmware.c`'s `throttle_state_t`). All of this is receive-side
+UI work on the handle - doesn't change anything about the telemetry
+transport constraints above (still one-way, still cosmetic-only, still
+never gating a control packet).

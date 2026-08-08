@@ -17,10 +17,14 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
+#include <string.h>
+#include <stdbool.h>
 #include "main.h"
 #include "spi.h"
 #include "gpio.h"
 #include "nrf24.h"
+#include "throttle_protocol.h"
+#include "crc8.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -35,14 +39,28 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
+#define TX_PACKET_PERIOD_MS    100u  /* well under WATCHDOG_RAMP_START_MS (175ms) so the watchdog
+                                        doesn't fight the sweep between every pair of packets - the
+                                        real protocol runs at 80Hz (12.5ms); this bring-up test just
+                                        needs to be fast enough not to look like a degraded link */
+#define TX_TEST_CYCLE_PACKETS   60u  /* ~6s at TX_PACKET_PERIOD_MS/packet: how often the TX role tests START_REQ */
+#define TX_TEST_START_PACKETS    9u  /* ~0.9s: how long START_REQ holds during that test window */
+
 /* Two-board TX/RX smoke test (DEVELOPMENT/radio/README.md bring-up step 3).
- * Set to 1, build, and flash the first ("TX") board - it sends an
- * incrementing counter every ~300ms. Set to 0, rebuild, and flash the
- * second ("RX") board - it listens and stores each received counter in
- * rx_last_counter / rx_packet_count, inspectable via a debugger breakpoint
- * on the line noted below. Only flash/debug one board at a time; let the
- * other free-run on USB power without an attached debug session. */
-#define BRINGUP_ROLE_TX 0
+ * Set to 1, build, and flash the first ("TX") board - it sends a real,
+ * protocol-valid throttle_packet_t (sync/seq/CRC8 all correct, flags=0)
+ * every ~300ms, with the throttle field slowly triangle-sweeping between
+ * IDLE_THROTTLE_VALUE and 200 so a receiving board's servo visibly moves -
+ * an easy confirmation that packets are being received and VALIDATED
+ * (sync/CRC8/sequence all passing), not just that SPI/radio transactions
+ * are happening. Set to 0, rebuild, and flash the second ("RX") board -
+ * it listens and stores each received counter in rx_last_counter/
+ * rx_packet_count (this path still expects the OLD raw-counter-in-every-
+ * byte format from before this file sent real packets; only meaningful
+ * against another spi-bringup board in TX role, not receiver-prod).
+ * Only flash/debug one board at a time; let the other free-run on USB or
+ * battery power without an attached debug session. */
+#define BRINGUP_ROLE_TX 1
 
 /* USER CODE END PD */
 
@@ -121,7 +139,16 @@ int main(void)
   uint8_t setup_retr_val = nrf24_read_reg(NRF24_REG_SETUP_RETR);
 
 #if BRINGUP_ROLE_TX
-  uint8_t tx_counter = 0;
+  uint8_t tx_seq = 0;
+  uint8_t tx_throttle = IDLE_THROTTLE_VALUE;
+  int8_t  tx_sweep_dir = 1;
+  uint32_t tx_packet_num = 0;
+  /* Set to 1 via a debugger breakpoint/variable edit to send ONE packet
+   * with CMD_FLAG_KILL, then it auto-resets to 0. Deliberately NOT part of
+   * the automatic test cycle below: KILL is sticky on the receiver (needs
+   * a physical re-arm/power-cycle to clear), so firing it on a timer would
+   * lock board B mid-test. */
+  volatile uint8_t tx_send_kill = 0;
   /* nrf24_init() already leaves the chip in TX mode (PRIM_RX=0, CE low). */
 #else
   uint32_t rx_packet_count = 0;
@@ -139,11 +166,50 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 #if BRINGUP_ROLE_TX
-    uint8_t payload[NRF24_PAYLOAD_SIZE] = { tx_counter, tx_counter, tx_counter, tx_counter, tx_counter };
-    nrf24_send_payload(payload, NRF24_PAYLOAD_SIZE);
+    /* Every TX_TEST_CYCLE_PACKETS (~6s), pause the throttle sweep and hold
+     * CMD_FLAG_START_REQ + idle throttle for TX_TEST_START_PACKETS (~0.9s)
+     * to satisfy start_tick()'s IDLE_THRESHOLD_FOR_START gate - a clean,
+     * repeatable, non-sticky test of the wireless START path, well under
+     * MAX_CRANK_MS so it always ends via voluntary release (blue LED while
+     * held, green on release), never the forced-stop/cooldown path. */
+    bool test_start_window = (tx_packet_num % TX_TEST_CYCLE_PACKETS) < TX_TEST_START_PACKETS;
+
+    throttle_packet_t pkt;
+    pkt.sync = PACKET_SYNC_BYTE;
+    pkt.seq = tx_seq++;
+    pkt.throttle = test_start_window ? IDLE_THROTTLE_VALUE : tx_throttle;
+    pkt.flags = 0;
+    if (tx_send_kill) {
+      pkt.flags |= CMD_FLAG_KILL;
+      tx_send_kill = 0; /* one-shot */
+    } else if (test_start_window) {
+      pkt.flags |= CMD_FLAG_START_REQ;
+    }
+    pkt.crc8 = crc8_compute((const uint8_t *)&pkt, PACKET_CRC_LEN);
+
+    uint8_t raw[PACKET_SIZE];
+    memcpy(raw, &pkt, PACKET_SIZE);
+    nrf24_send_payload(raw, (uint8_t)PACKET_SIZE);
     uint8_t tx_fifo_status = nrf24_read_reg(NRF24_REG_FIFO_STATUS);
-    tx_counter++; /* breakpoint here; tx_fifo_status should have TX_EMPTY (0x10) set after each send */
-    HAL_Delay(300);
+    (void)tx_fifo_status; /* breakpoint here if debugging; TX_EMPTY (0x10) should be set after each send */
+
+    tx_packet_num++;
+
+    /* Slow triangle sweep, step 1 every TX_PACKET_PERIOD_MS (~20s per
+     * direction) - paused during the START test window above so throttle
+     * stays at idle for that gate, then resumes from where it left off. The
+     * receiving board's servo moving is a visual confirmation that packets
+     * are being received AND validated, not just that radio traffic is
+     * happening at all. */
+    if (test_start_window) {
+      /* sweep paused this packet */
+    } else if (tx_sweep_dir > 0) {
+      if (tx_throttle >= 200) { tx_sweep_dir = -1; } else { tx_throttle += 1; }
+    } else {
+      if (tx_throttle <= IDLE_THROTTLE_VALUE) { tx_sweep_dir = 1; } else { tx_throttle -= 1; }
+    }
+
+    HAL_Delay(TX_PACKET_PERIOD_MS);
 #else
     if (nrf24_rx_available()) {
       uint8_t payload[NRF24_PAYLOAD_SIZE];

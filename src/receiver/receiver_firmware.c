@@ -131,8 +131,11 @@ static void cut_ignition(void) {
  * (unlike the handle): this is a deliberately-placed physical button on an
  * installed unit, not something loose that could get bumped in flight. */
 static bool read_local_start_button(void) {
-    // return HAL_GPIO_ReadPin(LOCAL_START_GPIO_Port, LOCAL_START_Pin) == GPIO_PIN_RESET;
-    return false; /* placeholder */
+#ifdef RECEIVER_PROD_BOARD
+    return HAL_GPIO_ReadPin(LOCAL_START_BTN_GPIO_Port, LOCAL_START_BTN_Pin) == GPIO_PIN_RESET;
+#else
+    return false; /* placeholder: no local start button on this board/build */
+#endif
 }
 
 /* Drive the starter solenoid via its relay/opto (energize-to-crank). The crank
@@ -201,21 +204,45 @@ static void start_tick(void) {
  * track their command-flag levels on every valid packet, so a dropped packet
  * only delays a change by one TX period and self-heals. Cruise (CMD_FLAG_CRUISE)
  * needs no action here - the handle already froze the throttle it sent, so the
- * value flows through the normal rate-limited throttle path transparently. */
+ * value flows through the normal rate-limited throttle path transparently.
+ * Stored into g_aux1_state/g_aux2_state, not just written straight to a HAL
+ * call, so a real board's own driver code can read the latest commanded
+ * state independent of packet arrival - same externally-observed-state
+ * pattern already used for g_state/g_current_servo_throttle elsewhere in
+ * this file (see DEVELOPMENT/receiver/firmware/Src/bench_app.c for the
+ * precedent). */
+static bool g_aux1_state = false;
+static bool g_aux2_state = false;
+
 static void apply_aux_outputs(const throttle_packet_t *pkt) {
-    bool aux1 = (pkt->flags & CMD_FLAG_AUX1) != 0;
-    bool aux2 = (pkt->flags & CMD_FLAG_AUX2) != 0;
-    // HAL_GPIO_WritePin(AUX1_OUT_GPIO_Port, AUX1_OUT_Pin, aux1 ? GPIO_PIN_SET : GPIO_PIN_RESET);
-    // HAL_GPIO_WritePin(AUX2_OUT_GPIO_Port, AUX2_OUT_Pin, aux2 ? GPIO_PIN_SET : GPIO_PIN_RESET);
-    (void)aux1; (void)aux2;
+    g_aux1_state = (pkt->flags & CMD_FLAG_AUX1) != 0;
+    g_aux2_state = (pkt->flags & CMD_FLAG_AUX2) != 0;
+    // HAL_GPIO_WritePin(AUX1_OUT_GPIO_Port, AUX1_OUT_Pin, g_aux1_state ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    // HAL_GPIO_WritePin(AUX2_OUT_GPIO_Port, AUX2_OUT_Pin, g_aux2_state ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 
 /* --- Local battery monitor (receiver side) --- identical scheme to the
- * handle, on this unit's own pack: LED bar on from power-up, piezo when low. */
+ * handle, on this unit's own pack. set_battery_leds()/set_buzzer() stay
+ * no-op stubs (this board folds low-battery indication into the tri-color
+ * status LED instead - see prod_app.c); g_batt_low below is still the real,
+ * externally-readable signal driving that. */
 static uint16_t read_battery_mv(void) {
+#ifdef RECEIVER_PROD_BOARD
+    HAL_ADC_Start(&hadc1);
+    HAL_ADC_PollForConversion(&hadc1, 10);
+    uint32_t raw = HAL_ADC_GetValue(&hadc1);
+    /* 12-bit ADC, VDDA ~= 3300mV reference, 1:1 (no divider) as a
+     * placeholder - MUST be replaced with the real resistor-divider ratio
+     * before ever connecting an actual battery pack above ~3.3V, or the
+     * pack voltage will be fed directly into the ADC pin and exceed its
+     * absolute max rating. See docs/OPEN-ITEMS.md "Battery chemistry/
+     * voltage per pack". */
+    return (uint16_t)((raw * 3300u) / 4095u);
+#else
     // uint32_t raw = HAL_ADC_GetValue(&hadc_batt);
     // return (uint16_t)(raw * ADC_MV_PER_LSB * DIVIDER_RATIO);
     return RX_BATT.full_mv; /* placeholder: pretend full */
+#endif
 }
 
 static void set_battery_leds(uint8_t lit) {
