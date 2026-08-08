@@ -24,6 +24,13 @@
 #include "stm32l4xx_hal.h" /* HAL_GetTick() for millis() below */
 #endif
 
+/* --- Hardware handles (fill in during board bring-up) --- */
+// extern nrf24_handle_t g_radio;  /* nRF24L01+ instance - see src/common/nrf24.h. Pin
+//                                     assignment blocked on docs/OPEN-ITEMS.md's pin budget
+//                                     item: the receiver bench rig already committed all 17
+//                                     free GPIOs, with no room for SPI+CE, before radio work
+//                                     started. */
+
 typedef enum {
     STATE_IDLE_SAFE,   /* normal armed operation: throttle live, start allowed. Without a tach we
                           cannot sense whether the engine is actually running, so this one state
@@ -322,20 +329,25 @@ static void crank_tick(void) {
 int receiver_firmware_main(void) {
     /* --- Init section (fill in) ---
      * HAL_Init(); SystemClock_Config(); MX_GPIO_Init(); MX_TIM_PWM_Init();
-     * radio.begin();
-     * radio.setPALevel(RF24_PA_HIGH);
-     * radio.setDataRate(RF24_250KBPS);
-     * radio.setChannel(...);          // must match handle
-     * radio.setAutoAck(false);
-     * radio.startListening();
+     * MX_SPI1_Init();                     // + assign g_radio's hspi/CE/CSN pins here -
+     *                                      // still blocked on the pin-budget item above
+     * nrf24_init(&g_radio);                // EN_AA off (ADR 0001), PA_HIGH, static payload -
+     *                                      // see src/common/nrf24.h. Channel/address are still
+     *                                      // bring-up placeholders (docs/OPEN-ITEMS.md "Channel
+     *                                      // selection"), and RF_SETUP defaults to 1Mbps as a
+     *                                      // bring-up diagnostic finding, not a final data-rate
+     *                                      // decision - see docs/decisions/0005-radio-choice-
+     *                                      // and-ignition-emi.md's 2026-08-06 addendum. Must
+     *                                      // match the handle's channel/address/rate exactly.
+     * nrf24_enter_rx_mode(&g_radio);        // receiver listens continuously
      */
 
     uint32_t last_tick = millis();
 
     while (1) {
-        /* if (radio.available()) {
+        /* if (nrf24_rx_available(&g_radio)) {
          *     uint8_t buf[PACKET_SIZE];
-         *     radio.read(buf, PACKET_SIZE);
+         *     nrf24_read_payload(&g_radio, buf, PACKET_SIZE);
          *     on_packet_received(buf, PACKET_SIZE);
          * }
          */

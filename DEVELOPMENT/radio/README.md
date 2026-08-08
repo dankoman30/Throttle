@@ -189,6 +189,26 @@ or bumping to a Nucleo-64 — already noted as the fallback in
    commented-out stubs) and re-verify both bench rigs end-to-end over real
    radio instead of GPIO-simulated input.
 
+   **Driver promoted, 2026-08-07; firmware wiring still blocked.** The
+   proven `nrf24.c`/`nrf24.h` driver now lives in `src/common/` (shared,
+   real, compiled code - not the bring-up project's copy), parameterized
+   via an `nrf24_handle_t` so handle and receiver each supply their own SPI
+   peripheral and CE/CSN pins rather than relying on hardcoded globals. Both
+   firmware files' stub comments were updated to reference the real
+   `nrf24_*` API (replacing stale TMRh20/RF24-library-style pseudocode from
+   before the fork-vs-custom-driver decision), but the calls themselves stay
+   commented, not live, because two concrete prerequisites are still open:
+   - **Receiver**: no free GPIOs for SPI+CE — the bench rig already
+     committed all 17 (see "Known integration constraint" above). Needs
+     either freeing pins or a Nucleo-64 before real pins can be assigned.
+   - **Handle**: no real hardware project exists yet at all (unlike the
+     receiver's `DEVELOPMENT/receiver/firmware/`) — only the bring-up boards
+     have been wired/programmed so far.
+
+   Host compile-checks (`test/test_logic.c` and both firmware
+   `.c` files) still pass unchanged - `nrf24.h`/`nrf24.c` depend on the real
+   STM32 HAL and are new, not part of either check.
+
 ## Related docs
 
 - `docs/decisions/0005-radio-choice-and-ignition-emi.md` — why
