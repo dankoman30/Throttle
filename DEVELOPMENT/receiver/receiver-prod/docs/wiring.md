@@ -80,10 +80,17 @@ should hold for any standard-protocol servo.
 GND, red pin through a 220Ω resistor to 3.3V, lit red. Matches what
 `prod_app.c` already assumes (`GPIO_PIN_SET` = lit).
 
-- Common pin → **GND**
-- Red pin → 220Ω resistor → **A6 (PA7)**
-- Green pin → 220Ω resistor → **D9 (PA8)**
-- Blue pin → 220Ω resistor → **D10 (PA11)**
+**Physical pin order on this specific package: B-G-C-R** (Blue, Green,
+Common, Red, reading across the 4 leads in order — equivalently R-C-G-B
+from the other end). The common (C) pin is the longest lead; it's the
+*second* pin from the blue end, not an outer pin, so it's easy to
+miscount by one under this specific part — check the long lead, not just
+position, before wiring.
+
+- Common (longest lead, 2nd from the blue end) → **GND**
+- Red (outer pin, opposite end from blue) → 220Ω resistor → **A6 (PA7)**
+- Green (between blue and common) → 220Ω resistor → **D9 (PA8)**
+- Blue (outer pin, opposite end from red) → 220Ω resistor → **D10 (PA11)**
 
 220Ω was chosen because it's already confirmed working on the red channel;
 green/blue LEDs typically have a higher forward voltage than red, so they
