@@ -54,7 +54,8 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
 - [ ] **Servo selection** — measure pull force/travel across the full stroke
   **through the full installed cable run** (remote mount adds Bowden friction;
   the bare throttle cable understates it) before ordering (~15–25 kg·cm digital
-  metal-gear, continuous-duty ballpark). See ADR 0008.
+  metal-gear, continuous-duty ballpark). See ADR 0008. Fish scale ordered
+  2026-08-08 for the force measurement, arriving within a day or two.
 - [ ] **Remote servo mount + cable run (ADR 0008)** — the servo is frame-mounted,
   not on the engine, and drives the throttle via a push-pull/Bowden cable. To
   design: servo bracket, cable spec + routing (avoid tight bends), and slack/
@@ -117,6 +118,15 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
 - [ ] RF24 HAL port (TMRh20 is Arduino-first) for both ends — stays on the
   critical path given the HAL choice.
 - [ ] Servo PWM mapping: 0–255 throttle → pulse-width for the chosen servo.
+  `DEVELOPMENT/receiver/receiver-prod/`'s TIM2 (50 Hz servo PWM, `PA5`) is
+  currently set up for a **placeholder SG90 micro servo** (bench-test only,
+  not the final actuator): Prescaler=31, Period=19999 (these two just set the
+  50 Hz frame rate and should hold for any standard-protocol servo,
+  metal-gear included), Pulse=1500 (1.5 ms, SG90 center). Once the real servo
+  is selected (see "Servo selection" above), revisit the pulse-width
+  min/max mapped to full-closed/full-open throttle — likely just a firmware
+  constant change, not a CubeMX regeneration, unless the new servo uses a
+  non-standard control protocol.
 - [ ] **Trigger-ADC anti-alias + oversampling.** The trigger is sampled at 80 Hz,
   so hand/engine vibration above ~40 Hz **aliases** and no software filter can
   remove it. Add (hardware) an **RC low-pass on the ADC input** as an anti-alias
