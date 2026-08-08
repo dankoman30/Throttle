@@ -53,10 +53,22 @@ Per-packet validation order (discard entirely if any step fails):
 3. Sequence number check (must be newer, accounting for 0–255 rollover)
 
 Per-packet command handling order (kill always checked first):
-1. **Kill** — if set, cut ignition immediately, → `KILLED`, ignore rest of packet
+1. **Kill** — if set, cut ignition immediately, → `KILLED`, ignore rest of packet, also clears the latest recorded wireless start-request
 2. **Killed state is sticky** — only a physical/mechanical re-arm can clear it, no wireless command can
-3. **Start** — only actionable from `IDLE_SAFE`, only if packet throttle ≤ idle threshold, only if link isn't in post-loss recovery window
+3. **Start** — the packet handler only records the latest wireless start-request flag here; the actual gating and state transition happen independently of packet arrival (below), in `start_tick`, so a local start button at the receiver (ground-crew override, added 2026-08-07) also works with zero wireless packets ever received
 4. **Throttle** — applied only if not in post-loss recovery window, rate-limited per tick
+
+**Start gating (`start_tick`, independent of packet arrival, like the watchdog below):**
+combines the latest wireless flag with a debounced local start button into one
+signal, edge-triggers the crank start/stop off it — only actionable from
+`IDLE_SAFE`, only at idle throttle, only outside the post-loss recovery
+window, not during starter cooldown. Whichever crank begins records whether
+wireless was involved in triggering it; the crank's own loss-of-signal abort
+(part of the max-crank bounding logic) checks that recorded source rather
+than the local button's live reading, so a stuck/faulty local button can't
+silently defeat the fast abort for a wireless-triggered crank. There is
+deliberately no local kill button — the unit's hardwired master kill switch
+fills that role, same as the mechanical kill line described below.
 
 ## Watchdog / Loss-of-Signal Logic
 Runs independently of packet reception, on its own timer:

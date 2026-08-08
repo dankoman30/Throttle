@@ -9,6 +9,8 @@
  *   - Run the kill/start/run state machine (kill always highest priority)
  *   - Drive the servo, rate-limited
  *   - Independently watch for signal loss and ramp throttle to idle
+ *   - Honor a local start button as a ground-crew override, independent of
+ *     the wireless link (see start_tick())
  *
  * NOTE: the mechanical kill switch is NOT handled here at all - it must
  * be wired directly into the ignition kill line in hardware, completely
@@ -23,6 +25,39 @@
 #ifdef USE_HAL_DRIVER
 #include "stm32l4xx_hal.h" /* HAL_GetTick() for millis() below */
 #endif
+
+/* --- Hardware handles (fill in during board bring-up) --- */
+// extern nrf24_handle_t g_radio;  /* nRF24L01+ instance - see src/common/nrf24.h. Pin
+//                                     assignment blocked on docs/OPEN-ITEMS.md's pin budget
+//                                     item: the receiver bench rig already committed all 17
+//                                     free GPIOs, with no room for SPI+CE, before radio work
+//                                     started. */
+// GPIO define for the receiver's own local start button (ground-crew override -
+// lets the engine be started directly at the unit without the handle; see
+// start_tick() below). Distinct from the wireless CMD_FLAG_START_REQ path -
+// both feed the same gated crank logic. There is deliberately no local kill
+// button here: kill is handled by the existing hardwired mechanical switch
+// (see the file header note) plus the wireless CMD_FLAG_KILL path.
+
+/* Generic time-based debounce, same scheme as handle_firmware.c's: the raw
+ * reading must stay stable for INPUT_DEBOUNCE_MS before the debounced state
+ * changes, rejecting contact bounce. Used for the local start button. */
+typedef struct {
+    bool     raw_last;
+    bool     stable;
+    uint32_t last_change_ms;
+} debounce_t;
+
+static bool debounce_update(debounce_t *d, bool raw, uint32_t now) {
+    if (raw != d->raw_last) {
+        d->raw_last = raw;
+        d->last_change_ms = now;
+    }
+    if (raw != d->stable && (now - d->last_change_ms) >= INPUT_DEBOUNCE_MS) {
+        d->stable = raw;
+    }
+    return d->stable;
+}
 
 typedef enum {
     STATE_IDLE_SAFE,   /* normal armed operation: throttle live, start allowed. Without a tach we
@@ -48,10 +83,16 @@ static bool      g_recovering_from_loss = false;
 static uint8_t   g_current_servo_throttle = IDLE_THROTTLE_VALUE;
 static uint8_t   g_target_throttle = IDLE_THROTTLE_VALUE;
 
-/* Manual-crank state. The pilot holds the start button to crank and releases
- * when the engine catches (no tach in the controller - see ADR 0007). */
+/* Manual-crank state. The pilot (wireless) or ground crew (local button) holds
+ * the start request to crank and releases when the engine catches (no tach in
+ * the controller - see ADR 0007). Two independent trigger sources feed one
+ * combined, edge-tracked signal - see start_tick(). */
 static uint32_t  g_crank_start_ms = 0;            /* when the current crank began */
-static bool      g_start_req_prev = false;        /* previous packet's START_REQ, for rising-edge detection */
+static bool      g_wireless_start_req = false;    /* latest packet's CMD_FLAG_START_REQ, updated on every valid packet */
+static debounce_t g_local_start_db = { 0 };       /* local start button debounce state */
+static bool      g_local_start_pressed = false;   /* current debounced local button state, set by start_tick() */
+static bool      g_crank_is_local_only = false;   /* was wireless NOT involved in triggering the in-progress crank? set by begin_crank(), read by crank_tick() */
+static bool      g_start_req_prev = false;        /* previous tick's combined (wireless OR local) start request, for rising-edge detection */
 static uint32_t  g_starter_cooldown_until_ms = 0; /* refuse a new crank until this time (set only on a forced stop) */
 
 /* Local battery monitor state (receiver pack only - no telemetry to handle). */
@@ -84,6 +125,16 @@ static void cut_ignition(void) {
     // HAL_GPIO_WritePin(KILL_RELAY_GPIO_Port, KILL_RELAY_Pin, GPIO_PIN_SET);
 }
 
+/* Ground-crew start override, read directly at the receiver. Active-low
+ * (pressed = pin reads LOW), matching the handle's button convention -
+ * debounced in start_tick() via INPUT_DEBOUNCE_MS, no hold-to-start timer
+ * (unlike the handle): this is a deliberately-placed physical button on an
+ * installed unit, not something loose that could get bumped in flight. */
+static bool read_local_start_button(void) {
+    // return HAL_GPIO_ReadPin(LOCAL_START_GPIO_Port, LOCAL_START_Pin) == GPIO_PIN_RESET;
+    return false; /* placeholder */
+}
+
 /* Drive the starter solenoid via its relay/opto (energize-to-crank). The crank
  * is bounded by crank_tick + the main-loop safety net, never left on. */
 static void set_starter(bool on) {
@@ -91,10 +142,17 @@ static void set_starter(bool on) {
     (void)on;
 }
 
-/* Begin a crank. Only ever called from the gated rising-edge START path. */
-static void begin_crank(void) {
+/* Begin a crank. Only ever called from the gated rising-edge START path.
+ * 'local_only' records whether wireless was involved in triggering THIS
+ * crank (false if g_wireless_start_req was asserted at the triggering edge,
+ * even if the local button was also held) - crank_tick() uses this for the
+ * rest of the crank's duration to decide whether the loss-of-signal abort
+ * applies, so a coincidentally-stuck local button reading can't defeat that
+ * protection for a wireless-initiated crank. */
+static void begin_crank(bool local_only) {
     g_state = STATE_STARTING;
     g_crank_start_ms = millis();
+    g_crank_is_local_only = local_only;
     set_starter(true);
 }
 
@@ -108,6 +166,34 @@ static void end_crank(bool forced) {
         g_starter_cooldown_until_ms = millis() + STARTER_COOLDOWN_MS;
     }
     g_state = STATE_IDLE_SAFE;
+}
+
+/* Runs every control tick, independent of packet arrival (like watchdog_tick
+ * and crank_tick) - this is what lets the local start button work even when
+ * the wireless link is down entirely. Combines the two independent trigger
+ * sources (wireless CMD_FLAG_START_REQ, latest value via g_wireless_start_req;
+ * local button, debounced here) into one signal and edge-detects a fresh
+ * rising edge of THAT combined signal, so releasing either source while the
+ * other still holds keeps cranking - only releasing both stops it (besides
+ * the existing forced-stop paths in crank_tick). Gated the same way the
+ * wireless-only path used to gate itself: only from IDLE_SAFE, only at idle
+ * throttle, not during post-loss recovery, not during a post-forced-stop
+ * cooldown. */
+static void start_tick(void) {
+    uint32_t now = millis();
+    g_local_start_pressed = debounce_update(&g_local_start_db, read_local_start_button(), now);
+    bool start_req = g_wireless_start_req || g_local_start_pressed;
+
+    if (start_req && !g_start_req_prev &&
+        g_state == STATE_IDLE_SAFE &&
+        g_target_throttle <= IDLE_THRESHOLD_FOR_START &&
+        !g_recovering_from_loss &&
+        (int32_t)(now - g_starter_cooldown_until_ms) >= 0) {
+        begin_crank(!g_wireless_start_req);  /* -> STATE_STARTING; crank_tick + safety net bound it */
+    } else if (!start_req && g_state == STATE_STARTING) {
+        end_crank(false);       /* voluntary release: stop, no cooldown */
+    }
+    g_start_req_prev = start_req;
 }
 
 /* Accessory outputs (lights, smoke, ...). These are NON-safety and are
@@ -196,7 +282,9 @@ static void handle_valid_packet(const throttle_packet_t *pkt) {
         g_state = STATE_KILLED;
         g_target_throttle = IDLE_THROTTLE_VALUE;
         g_ramping_to_idle = false;     /* cancel any watchdog ramp so the servo is driven to idle below */
-        g_start_req_prev = true;       /* suppress a spurious rising edge if kill+start ever coincide */
+        g_wireless_start_req = false;  /* suppress a spurious rising edge if kill+start ever coincide */
+        g_start_req_prev = true;       /* (start_tick() re-evaluates every tick regardless of g_state,
+                                           so this also guards against the local button) */
         return; /* ignore throttle/start fields in this packet entirely */
     }
 
@@ -206,24 +294,12 @@ static void handle_valid_packet(const throttle_packet_t *pkt) {
         return;
     }
 
-    /* --- 2. START (manual crank): energize the starter on the RISING EDGE of a
-     *        hold-confirmed start request, and keep it cranking while the button
-     *        is held; releasing it (or a safety limit in crank_tick) stops it.
-     *        Edge-triggered so that after a max-crank cutoff the pilot must
-     *        release and re-press rather than re-cranking while still held.
-     *        Gated: only from IDLE_SAFE, only at idle throttle, not during
-     *        post-loss recovery, and not during a post-forced-stop cooldown. --- */
-    bool start_req = (pkt->flags & CMD_FLAG_START_REQ) != 0;
-    if (start_req && !g_start_req_prev &&
-        g_state == STATE_IDLE_SAFE &&
-        pkt->throttle <= IDLE_THRESHOLD_FOR_START &&
-        !g_recovering_from_loss &&
-        (int32_t)(millis() - g_starter_cooldown_until_ms) >= 0) {
-        begin_crank();          /* -> STATE_STARTING; crank_tick + safety net bound it */
-    } else if (!start_req && g_state == STATE_STARTING) {
-        end_crank(false);       /* voluntary release: stop, no cooldown */
-    }
-    g_start_req_prev = start_req;
+    /* --- 2. START (manual crank): just record the latest wireless request
+     *        here. The actual rising-edge detection, gating, and
+     *        begin_crank()/end_crank() calls happen in start_tick(), which
+     *        also combines in the local start button and runs every control
+     *        tick rather than only on packet arrival - see its comment. --- */
+    g_wireless_start_req = (pkt->flags & CMD_FLAG_START_REQ) != 0;
 
     /* --- 3. THROTTLE: apply pilot input to the SERVO TARGET only. Throttle
      *        position never drives state transitions - state is owned by the
@@ -304,14 +380,24 @@ static void watchdog_tick(void) {
  * arrival (like watchdog_tick), so a crank is stopped even if packets stop
  * coming. No-op unless we're STARTING. Two safety limits, both forced stops:
  *   - loss of signal (no valid packet for CRANK_LOSS_ABORT_MS): the pilot can't
- *     command kill wirelessly while the link is down, so don't crank blind;
- *   - max-crank backstop (MAX_CRANK_MS): a crank can never run away, even if the
- *     start button is held or a fault leaves START_REQ stuck asserted. */
+ *     command kill wirelessly while the link is down, so don't crank blind.
+ *     Only applies to a crank wireless was involved in triggering
+ *     (!g_crank_is_local_only, set once at begin_crank() and fixed for that
+ *     crank's duration - see its comment) - a purely local-button crank has
+ *     no wireless link to lose in the first place, so the check is
+ *     inapplicable there; releasing the local button already stops it via
+ *     start_tick()'s own edge detection. Gating on the CURRENT local button
+ *     reading instead of the crank's actual trigger source would let a
+ *     stuck/faulty local reading silently defeat this abort for a
+ *     wireless-initiated crank too - don't do that;
+ *   - max-crank backstop (MAX_CRANK_MS): a crank can never run away, even if a
+ *     start source is held or a fault leaves it stuck asserted - applies
+ *     regardless of trigger source. */
 static void crank_tick(void) {
     if (g_state != STATE_STARTING) return;
 
     uint32_t now = millis();
-    bool link_lost = (now - g_last_valid_packet_ms) >= CRANK_LOSS_ABORT_MS;
+    bool link_lost = !g_crank_is_local_only && (now - g_last_valid_packet_ms) >= CRANK_LOSS_ABORT_MS;
     bool too_long  = (now - g_crank_start_ms)       >= MAX_CRANK_MS;
 
     if (link_lost || too_long) {
@@ -322,20 +408,25 @@ static void crank_tick(void) {
 int receiver_firmware_main(void) {
     /* --- Init section (fill in) ---
      * HAL_Init(); SystemClock_Config(); MX_GPIO_Init(); MX_TIM_PWM_Init();
-     * radio.begin();
-     * radio.setPALevel(RF24_PA_HIGH);
-     * radio.setDataRate(RF24_250KBPS);
-     * radio.setChannel(...);          // must match handle
-     * radio.setAutoAck(false);
-     * radio.startListening();
+     * MX_SPI1_Init();                     // + assign g_radio's hspi/CE/CSN pins here -
+     *                                      // still blocked on the pin-budget item above
+     * nrf24_init(&g_radio);                // EN_AA off (ADR 0001), PA_HIGH, static payload -
+     *                                      // see src/common/nrf24.h. Channel/address are still
+     *                                      // bring-up placeholders (docs/OPEN-ITEMS.md "Channel
+     *                                      // selection"), and RF_SETUP defaults to 1Mbps as a
+     *                                      // bring-up diagnostic finding, not a final data-rate
+     *                                      // decision - see docs/decisions/0005-radio-choice-
+     *                                      // and-ignition-emi.md's 2026-08-06 addendum. Must
+     *                                      // match the handle's channel/address/rate exactly.
+     * nrf24_enter_rx_mode(&g_radio);        // receiver listens continuously
      */
 
     uint32_t last_tick = millis();
 
     while (1) {
-        /* if (radio.available()) {
+        /* if (nrf24_rx_available(&g_radio)) {
          *     uint8_t buf[PACKET_SIZE];
-         *     radio.read(buf, PACKET_SIZE);
+         *     nrf24_read_payload(&g_radio, buf, PACKET_SIZE);
          *     on_packet_received(buf, PACKET_SIZE);
          * }
          */
@@ -344,6 +435,9 @@ int receiver_firmware_main(void) {
         if (now != last_tick) { /* run watchdog + servo step roughly once per ms tick, adjust to your loop rate */
             last_tick = now;
             watchdog_tick();
+            start_tick();  /* before crank_tick(): a fresh crank's g_crank_is_local_only
+                               (set inside begin_crank(), called from start_tick()) must
+                               exist before crank_tick() can read it this same tick */
             crank_tick();
             /* Safety net: the starter must never be energized unless we are
              * actively cranking. Belt-and-suspenders against any path that

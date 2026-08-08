@@ -90,36 +90,63 @@ static uint8_t cruise_step(cruise_t *c, bool btn, uint8_t live, uint32_t now) {
 }
 
 /* --- mirror of receiver_firmware.c manual-crank logic (pure form) ---
- * Crank control is split across handle_valid_packet (rising-edge begin /
- * release end) and crank_tick (max-crank + loss-of-signal backstops); both are
- * mirrored here to test without the HAL stubs. */
+ * Two independent trigger sources - the wireless packet's CMD_FLAG_START_REQ
+ * and a local start button at the receiver - feed one combined, edge-tracked
+ * signal. handle_valid_packet only records the latest wireless flag
+ * (crk_wireless_update); start_tick (crk_start_tick) runs every control tick,
+ * independent of packet arrival, combines both sources, and does the actual
+ * rising-edge begin/release-end gating; crank_tick (crk_crank_tick) applies
+ * the max-crank and loss-of-signal backstops. All three are mirrored here to
+ * test without the HAL stubs. */
 typedef enum { S_IDLE, S_START } st_t;
 typedef struct {
     st_t     state;
     uint32_t crank_start;
     uint32_t cooldown_until;
-    bool     start_prev;
+    bool     start_prev;      /* previous tick's combined (wireless OR local) request */
+    bool     wireless_req;    /* latest packet's START_REQ flag */
+    bool     local_only;      /* was wireless NOT involved in triggering the in-progress crank? */
     bool     starter_on;
 } crk_t;
 
-/* one received packet: START_REQ present?, throttle at idle?, mid-recovery? */
-static void crk_packet(crk_t *c, bool start_req, bool throttle_ok, bool recovering, uint32_t now) {
+/* mirror of handle_valid_packet's START line (also mirrors KILL clearing it). */
+static void crk_wireless_update(crk_t *c, bool start_req) {
+    c->wireless_req = start_req;
+}
+
+/* mirror of start_tick(): runs every control tick, independent of packet
+ * arrival - 'local_pressed' is the (already debounced) local button state. */
+static void crk_start_tick(crk_t *c, bool local_pressed, bool throttle_ok, bool recovering, uint32_t now) {
+    bool start_req = c->wireless_req || local_pressed;
     if (start_req && !c->start_prev &&
         c->state == S_IDLE && throttle_ok && !recovering &&
         (int32_t)(now - c->cooldown_until) >= 0) {
         c->state = S_START; c->crank_start = now; c->starter_on = true;
+        c->local_only = !c->wireless_req;  /* was wireless involved in THIS crank's trigger? */
     } else if (!start_req && c->state == S_START) {
         c->starter_on = false; c->state = S_IDLE;   /* voluntary release: no cooldown */
     }
     c->start_prev = start_req;
 }
 
-/* independent tick: forced stops (loss / max-crank) impose a cooldown */
-static void crk_tick(crk_t *c, bool link_lost, uint32_t now) {
+/* mirror of crank_tick(): independent tick, forced stops impose a cooldown.
+ * link_down gates on c->local_only (recorded once at the crank's trigger,
+ * not the local button's live reading) so a stuck/faulty local reading can't
+ * silently defeat this abort for a wireless-triggered crank. */
+static void crk_crank_tick(crk_t *c, bool link_down, uint32_t now) {
     if (c->state != S_START) return;
+    bool link_lost = !c->local_only && link_down;
     if (link_lost || (now - c->crank_start) >= MAX_CRANK_MS) {
         c->starter_on = false; c->cooldown_until = now + STARTER_COOLDOWN_MS; c->state = S_IDLE;
     }
+}
+
+/* convenience for tests exercising only the wireless path: mirrors a packet
+ * arriving, then the same-tick start_tick() the real main loop always runs
+ * regardless of packet arrival, with the local button unpressed throughout. */
+static void crk_wire(crk_t *c, bool start_req, bool throttle_ok, bool recovering, uint32_t now) {
+    crk_wireless_update(c, start_req);
+    crk_start_tick(c, false /* local button not pressed */, throttle_ok, recovering, now);
 }
 
 /* --- mirror of handle_firmware.c throttle deadband/hysteresis --- */
@@ -270,46 +297,77 @@ int main(void) {
 
     /* --- manual crank: rising edge from IDLE at idle throttle begins a crank --- */
     { crk_t c = {0};
-      crk_packet(&c, false, true, false, 100); CHECK(c.state == S_IDLE);   /* no request */
-      crk_packet(&c, true,  true, false, 110); CHECK(c.state == S_START && c.starter_on); /* rising edge */
-      crk_tick(&c, false, 110 + 500);          CHECK(c.state == S_START && c.starter_on); /* held, within cap */
+      crk_wire(&c, false, true, false, 100); CHECK(c.state == S_IDLE);   /* no request */
+      crk_wire(&c, true,  true, false, 110); CHECK(c.state == S_START && c.starter_on); /* rising edge */
+      crk_crank_tick(&c, false, 110 + 500);  CHECK(c.state == S_START && c.starter_on); /* held, within cap */
     }
     /* --- won't begin unless throttle is at idle --- */
     { crk_t c = {0};
-      crk_packet(&c, true, false /* throttle high */, false, 100);
+      crk_wire(&c, true, false /* throttle high */, false, 100);
       CHECK(c.state == S_IDLE && !c.starter_on);
     }
     /* --- an already-held START_REQ does NOT begin a crank; it needs a fresh edge --- */
     { crk_t c = { .start_prev = true };
-      crk_packet(&c, true, true, false, 100);
+      crk_wire(&c, true, true, false, 100);
       CHECK(c.state == S_IDLE);
     }
     /* --- voluntary release stops the crank with NO cooldown -> instant re-crank --- */
     { crk_t c = {0};
-      crk_packet(&c, true,  true, false, 100); CHECK(c.state == S_START);
-      crk_packet(&c, false, true, false, 200); CHECK(c.state == S_IDLE && !c.starter_on);
+      crk_wire(&c, true,  true, false, 100); CHECK(c.state == S_START);
+      crk_wire(&c, false, true, false, 200); CHECK(c.state == S_IDLE && !c.starter_on);
       CHECK(c.cooldown_until == 0);                        /* no cooldown on a normal release */
-      crk_packet(&c, true,  true, false, 210); CHECK(c.state == S_START); /* re-crank immediately */
+      crk_wire(&c, true,  true, false, 210); CHECK(c.state == S_START); /* re-crank immediately */
     }
     /* --- max-crank backstop force-stops a held crank and imposes cooldown --- */
     { crk_t c = {0};
-      crk_packet(&c, true, true, false, 0);      CHECK(c.state == S_START);
-      crk_tick(&c, false, MAX_CRANK_MS - 1);     CHECK(c.state == S_START);
-      crk_tick(&c, false, MAX_CRANK_MS);         CHECK(c.state == S_IDLE && !c.starter_on);
+      crk_wire(&c, true, true, false, 0);          CHECK(c.state == S_START);
+      crk_crank_tick(&c, false, MAX_CRANK_MS - 1); CHECK(c.state == S_START);
+      crk_crank_tick(&c, false, MAX_CRANK_MS);     CHECK(c.state == S_IDLE && !c.starter_on);
       CHECK(c.cooldown_until == MAX_CRANK_MS + STARTER_COOLDOWN_MS);
-      crk_packet(&c, true, true, false, MAX_CRANK_MS + 10); /* still held -> no re-crank (no edge) */
+      crk_wire(&c, true, true, false, MAX_CRANK_MS + 10); /* still held -> no re-crank (no edge) */
       CHECK(c.state == S_IDLE);
     }
-    /* --- loss of signal aborts the crank fast (before the max-crank cap) --- */
+    /* --- loss of signal aborts a wireless-triggered crank fast (before the max-crank cap) --- */
     { crk_t c = {0};
-      crk_packet(&c, true, true, false, 0);   CHECK(c.state == S_START);
-      crk_tick(&c, true /* link lost */, 50); CHECK(c.state == S_IDLE && !c.starter_on);
+      crk_wire(&c, true, true, false, 0);          CHECK(c.state == S_START && !c.local_only);
+      crk_crank_tick(&c, true /* link down */, 50); CHECK(c.state == S_IDLE && !c.starter_on);
     }
     /* --- cooldown blocks a fresh crank until it elapses --- */
     { crk_t c = { .cooldown_until = 5000 };
-      crk_packet(&c, true,  true, false, 4000); CHECK(c.state == S_IDLE);  /* still cooling down */
-      crk_packet(&c, false, true, false, 4500);                           /* release to re-arm the edge */
-      crk_packet(&c, true,  true, false, 5000); CHECK(c.state == S_START); /* cooldown elapsed */
+      crk_wire(&c, true,  true, false, 4000); CHECK(c.state == S_IDLE);  /* still cooling down */
+      crk_wire(&c, false, true, false, 4500);                           /* release to re-arm the edge */
+      crk_wire(&c, true,  true, false, 5000); CHECK(c.state == S_START); /* cooldown elapsed */
+    }
+
+    /* --- local start button (ground-crew override): a rising edge on the
+     * local button alone, with ZERO wireless packets ever received, begins a
+     * crank exactly like the wireless path does. --- */
+    { crk_t c = {0};
+      crk_start_tick(&c, false, true, false, 100); CHECK(c.state == S_IDLE);   /* not pressed */
+      crk_start_tick(&c, true,  true, false, 110); CHECK(c.state == S_START && c.starter_on && c.local_only);
+    }
+    /* --- and it survives an indefinitely-down link (no self-abort), since
+     * crk_crank_tick's loss-of-signal check is inapplicable to a
+     * local_only crank - releasing the button is what stops it. --- */
+    { crk_t c = {0};
+      crk_start_tick(&c, true, true, false, 0);       CHECK(c.state == S_START && c.local_only);
+      crk_crank_tick(&c, true /* link down */, 100);  CHECK(c.state == S_START); /* NOT aborted */
+      crk_start_tick(&c, false, true, false, 200);    CHECK(c.state == S_IDLE); /* released -> stops */
+    }
+    /* --- regression: a stuck/faulty local button reading must NOT defeat the
+     * loss-of-signal abort for a crank wireless actually triggered. Even
+     * though local_pressed reads true throughout (simulating a stuck input),
+     * c.local_only is false because wireless_req was the one that caused the
+     * rising edge, so the abort still fires. This is exactly the gap flagged
+     * by the receiver's safety review of this feature - crank_tick() must
+     * key off the crank's recorded trigger source, not the button's live
+     * (and here, faulty) reading. --- */
+    { crk_t c = {0};
+      crk_wireless_update(&c, true);
+      crk_start_tick(&c, true /* local ALSO reads pressed */, true, false, 0);
+      CHECK(c.state == S_START && !c.local_only);  /* wireless was involved -> not local_only */
+      crk_crank_tick(&c, true /* link down */, 50);
+      CHECK(c.state == S_IDLE && !c.starter_on);   /* still aborts despite the stuck-true local reading */
     }
 
     /* --- throttle deadband/hysteresis: small jitter held, larger moves pass --- */

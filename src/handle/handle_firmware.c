@@ -22,7 +22,10 @@
 
 /* --- Hardware handles (fill in during board bring-up) --- */
 // extern ADC_HandleTypeDef hadc1;         /* trigger position input */
-// extern RF24 radio;                       /* nRF24L01+ instance (RF24 library) */
+// extern nrf24_handle_t g_radio;           /* nRF24L01+ instance - see src/common/nrf24.h.
+//                                              Pin assignment not yet finalized (no real handle
+//                                              board project exists yet - DEVELOPMENT/radio/ only
+//                                              covers bring-up boards so far). */
 // GPIO defines for kill switch input, start button input
 
 /* Generic time-based debounce for momentary/rocker inputs: the raw reading must
@@ -326,7 +329,7 @@ static void build_and_send_packet(void) {
 
     pkt.crc8 = crc8_compute((const uint8_t *)&pkt, PACKET_CRC_LEN);
 
-    // radio.write(&pkt, PACKET_SIZE);  /* RF24 library call */
+    // nrf24_send_payload(&g_radio, (const uint8_t *)&pkt, PACKET_SIZE);
 }
 
 /* --- Local battery monitor (transmitter side) ---
@@ -367,15 +370,17 @@ int handle_firmware_main(void) {
      * SystemClock_Config();
      * MX_ADC1_Init();
      * MX_GPIO_Init();
-     * radio.begin();
-     * radio.setPALevel(RF24_PA_HIGH);
-     * radio.setDataRate(RF24_250KBPS);   // favor range/reliability over throughput here
-     * radio.setChannel(...);              // pick a clear channel, consider scanning on boot
-     * radio.setAutoAck(false);            // we don't need ack for this use case; sending fast
-     *                                      // and relying on sequence numbers + watchdog is simpler
-     *                                      // and avoids ack-related latency. Reconsider if you want
-     *                                      // confirmed delivery for kill specifically.
-     * radio.stopListening();              // handle only transmits
+     * MX_SPI1_Init();                      // + assign g_radio's hspi/CE/CSN pins here
+     * nrf24_init(&g_radio);                 // EN_AA off (ADR 0001), PA_HIGH, static payload -
+     *                                       // see src/common/nrf24.h. Channel/address are still
+     *                                       // bring-up placeholders (docs/OPEN-ITEMS.md "Channel
+     *                                       // selection"), and RF_SETUP defaults to 1Mbps as a
+     *                                       // bring-up diagnostic finding, not a final data-rate
+     *                                       // decision - see docs/decisions/0005-radio-choice-
+     *                                       // and-ignition-emi.md's 2026-08-06 addendum.
+     *                                       // nrf24_init() already leaves the chip ready to
+     *                                       // transmit (PTX, CE low) - handle needs no further
+     *                                       // mode call.
      */
 
     uint32_t last_tx = millis();

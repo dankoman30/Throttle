@@ -88,16 +88,18 @@ spacing pins out more (not possible — fixed by the real connector pinout),
 or just accepting the clutter since electrical correctness doesn't depend
 on it.
 
-**Radio link — design decided, hardware ordered, nothing built.** Bring-up
-plan, hardware rationale, and a real gotcha already caught (STM32L432KC's
-*default* SPI1 pins are `PA5`/`PA6`/`PA7` — exactly the SB16/SB18-bridged
-pins; use the `PB3`/`PB4`/`PB5` alternate mapping instead) are fully
-documented in **`DEVELOPMENT/radio/README.md`** — read that file first when
-resuming this thread. Ordered: 4× nRF24L01+PA+LNA (Addicore), 2 additional
-Nucleo-32 L432KC boards (→ 4 total, only 1 has SB16/SB18 removed), an
-electrolytic + ceramic capacitor assortment kit, and a LONELY BINARY
-8-channel 24MHz logic analyzer (pair with sigrok/PulseView, not vendor
-software).
+**Radio link — design decided, hardware partially arrived, nothing built.**
+Bring-up plan, hardware rationale, and a real gotcha already caught
+(STM32L432KC's *default* SPI1 pins are `PA5`/`PA6`/`PA7` — exactly the
+SB16/SB18-bridged pins; use the `PB3`/`PB4`/`PB5` alternate mapping instead)
+are fully documented in **`DEVELOPMENT/radio/README.md`** — read that file
+first when resuming this thread, it has the current arrival status. As of
+2026-08-03: the electrolytic + ceramic capacitor assortment kits and the
+LONELY BINARY 8-channel 24MHz logic analyzer (pair with sigrok/PulseView,
+not vendor software) have **arrived**; the 4× nRF24L01+PA+LNA modules
+(Addicore) and the 2 additional Nucleo-32 L432KC boards (→ 4 total, only 1
+has SB16/SB18 removed) are **still in transit**. Nothing to build yet until
+those land, other than a quick PulseView smoke test on the logic analyzer.
 
 ## What's next (once hardware arrives)
 
