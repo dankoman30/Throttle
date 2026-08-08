@@ -81,10 +81,9 @@ static bool      g_cruise_idle_last = false;    /* was throttle at/below the rea
 static uint32_t  g_cruise_idle_since_ms = 0;     /* when throttle most recently arrived at/below it */
 static bool      g_cruise_idle_rearmed = false;  /* continuous hold satisfied; next real move cancels cruise */
 
-/* Debounce state for the cruise button and the two accessory inputs. */
+/* Debounce state for the cruise button and the accessory input. */
 static debounce_t g_cruise_btn_db;
 static debounce_t g_aux1_db;
-static debounce_t g_aux2_db;
 
 /* Local battery monitor state (this pack only - no telemetry from receiver). */
 static uint32_t  g_batt_last_poll_ms = 0;
@@ -184,11 +183,6 @@ static bool read_cruise_button_raw(void) { /* closed = pressed */
 
 static bool read_aux1_switch(void) { /* e.g. lights: closed = on */
     // return HAL_GPIO_ReadPin(AUX1_GPIO_Port, AUX1_Pin) == GPIO_PIN_SET;
-    return false; /* placeholder */
-}
-
-static bool read_aux2_switch(void) { /* e.g. smoke: closed = on */
-    // return HAL_GPIO_ReadPin(AUX2_GPIO_Port, AUX2_Pin) == GPIO_PIN_SET;
     return false; /* placeholder */
 }
 
@@ -322,10 +316,9 @@ static void build_and_send_packet(void) {
         pkt.flags |= CMD_FLAG_START_REQ;
     }
 
-    /* Accessories are independent, debounced level flags (lights/smoke) - they
-     * ride alongside whatever the primary command is, including kill. */
+    /* Accessory is an independent, debounced level flag (lights) - it rides
+     * alongside whatever the primary command is, including kill. */
     if (debounce_update(&g_aux1_db, read_aux1_switch(), now)) pkt.flags |= CMD_FLAG_AUX1;
-    if (debounce_update(&g_aux2_db, read_aux2_switch(), now)) pkt.flags |= CMD_FLAG_AUX2;
 
     pkt.crc8 = crc8_compute((const uint8_t *)&pkt, PACKET_CRC_LEN);
 

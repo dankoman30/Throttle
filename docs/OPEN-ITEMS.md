@@ -22,10 +22,11 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
 - [ ] **Tune loss-of-signal watchdog** on the bench: `WATCHDOG_RAMP_START_MS`
   (175), `WATCHDOG_FULL_IDLE_MS` (600), `RAMP_TO_IDLE_DURATION_MS` (400),
   `LINK_RESTORE_STABLE_MS` (300). Current values are starting points.
-- [ ] **Aux-output policy during KILL / loss of signal.** Confirm desired
-  behavior: smoke off when killed and on full signal loss (safety), lights
-  independent. Currently `apply_aux_outputs` mirrors flags after the safety
-  state machine; decide whether smoke must be force-gated in firmware.
+- [x] ~~Aux-output policy during KILL / loss of signal (smoke force-gating)~~ —
+  **moot**: AUX2 (smoke) removed 2026-08-08 to fit the handle's pin budget.
+  Only AUX1 (lights) remains, which needs no special kill/loss-of-signal
+  policy - `apply_aux_outputs` already mirrors its flag after the safety
+  state machine runs, independent of kill/throttle.
 - [ ] **Confirm mechanical kill wiring** is independent of the MCU and grounds
   the ignition line with zero power to electronics (backup for a dead radio).
 - [x] ~~`RUNNING` → `IDLE_SAFE` restart policy~~ / ~~RPM START guard not fail-safe~~ —
@@ -103,7 +104,9 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   Deutsch/Amphenol preferred).
 - [ ] **Battery readout wiring** — 3/4-LED bar + piezo buzzer per side.
 - [ ] **Cruise / accessory switch wiring** — momentary (cruise) + rocker/momentary
-  (lights, smoke), all "closed = on" with pull-downs (kill is the exception).
+  (lights), all "closed = on" with pull-downs (kill is the exception). (AUX2/
+  smoke removed 2026-08-08 to fit the handle's pin budget - only one
+  accessory switch now.)
 
 ## Firmware TODOs
 

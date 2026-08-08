@@ -27,7 +27,7 @@ name)**.
 | Starter relay | D6 | PB1 (`STARTER_RELAY`) | out | **Not yet wired** — see "Known gaps" |
 | Tri-color LED green | D9 | PA8 (`LED_GREEN`) | out | |
 | AUX1 (lights, placeholder LED for now) | D1/TX | PA9 (`AUX1_OUT`) | out | |
-| AUX2 (smoke, placeholder LED for now) | D0/RX | PA10 (`AUX2_OUT`) | out | |
+| *(spare)* | D0/RX | PA10 (`AUX2_OUT`) | — | Reserved in CubeMX, unused in code — AUX2 (smoke) removed 2026-08-08 to save a pin on the handle. Physically leave disconnected or reclaim for something else. |
 | Tri-color LED blue | D10 | PA11 (`LED_BLUE`) | out | |
 | Radio SCK | D13 | PB3 (`SPI1_SCK`) | out | onboard LD3 flickers with SPI clock — harmless |
 | Radio MISO | D12 | PB4 (`SPI1_MISO`) | in | |
@@ -113,17 +113,16 @@ in this project. No hold-to-start timer, just debounced
 placed physical button on an installed unit, not something loose that could
 get bumped).
 
-## AUX1 / AUX2 (accessory outputs)
+## AUX1 (accessory output)
 
-Eventually these will drive relays for lights/smoke. **For now, wired as
-individual indicator LEDs** just to confirm the circuits are functioning —
-standard LED wiring, same as the tri-color LED's individual channels but
-each with its own cathode-to-GND (these are plain single LEDs, not part of
-the tri-color package):
-- **AUX1 (lights placeholder)**: **D1/TX (PA9)** → resistor (~220–330Ω) →
-  LED anode → LED cathode → GND
-- **AUX2 (smoke placeholder)**: **D0/RX (PA10)** → resistor → LED anode →
-  LED cathode → GND
+Eventually this will drive a relay for lights. **For now, wired as an
+individual indicator LED** just to confirm the circuit is functioning —
+standard LED wiring (a plain single LED, not part of the tri-color
+package): **D1/TX (PA9)** → resistor (~220–330Ω) → LED anode → LED
+cathode → GND.
+
+(AUX2/smoke was part of the original plan and removed 2026-08-08 to save
+a pin budget on the handle — see the pin table's "spare" note for `PA10`.)
 
 ## Known gaps — deliberately left unconnected
 
