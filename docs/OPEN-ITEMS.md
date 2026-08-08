@@ -149,8 +149,11 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   building eventually, but as a separate, strictly one-way, structurally
   isolated feature (own packet type/pipe, never able to delay or gate a
   control packet), after the primary control link is working. Not a
-  flight-readiness blocker on its own; see the same addendum for the
-  reasoning and constraints.
+  flight-readiness blocker on its own. **When built, the handle should show**
+  its own battery level side by side with the receiver's (telemetered), plus
+  receiver system status (cranking/idle-armed/killed) — see the 2026-08-08
+  addendum in `docs/decisions/0001-no-radio-ack.md` for the full reasoning
+  and transport constraints.
 - [ ] Low priority: evaluate **CRC8 → CRC16** given the EMI environment (packet
   5→6 bytes). CRC8 is defensible today — sync + seq filtering plus throttle
   rate-limiting contain any single false-accept — but worth revisiting if the
