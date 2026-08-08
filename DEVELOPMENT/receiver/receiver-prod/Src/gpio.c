@@ -52,13 +52,16 @@ void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, NRF_CE_Pin|NRF_CSN_Pin|LED_RED_Pin|LED_GREEN_Pin
-                          |LED_BLUE_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, NRF_CE_Pin|NRF_CSN_Pin|KILL_RELAY_Pin|LED_RED_Pin
+                          |LED_GREEN_Pin|AUX1_OUT_Pin|AUX2_OUT_Pin|LED_BLUE_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : NRF_CE_Pin NRF_CSN_Pin LED_RED_Pin LED_GREEN_Pin
-                           LED_BLUE_Pin */
-  GPIO_InitStruct.Pin = NRF_CE_Pin|NRF_CSN_Pin|LED_RED_Pin|LED_GREEN_Pin
-                          |LED_BLUE_Pin;
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(STARTER_RELAY_GPIO_Port, STARTER_RELAY_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : NRF_CE_Pin NRF_CSN_Pin KILL_RELAY_Pin LED_RED_Pin
+                           LED_GREEN_Pin AUX1_OUT_Pin AUX2_OUT_Pin LED_BLUE_Pin */
+  GPIO_InitStruct.Pin = NRF_CE_Pin|NRF_CSN_Pin|KILL_RELAY_Pin|LED_RED_Pin
+                          |LED_GREEN_Pin|AUX1_OUT_Pin|AUX2_OUT_Pin|LED_BLUE_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -77,6 +80,13 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(LOCAL_START_BTN_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : STARTER_RELAY_Pin */
+  GPIO_InitStruct.Pin = STARTER_RELAY_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(STARTER_RELAY_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : VCP_RX_Pin */
   GPIO_InitStruct.Pin = VCP_RX_Pin;

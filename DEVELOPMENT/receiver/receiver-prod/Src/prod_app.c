@@ -1,0 +1,193 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Copyright (C) 2026 Daniel Koman */
+/* ---------------------------------------------------------------------
+ * prod_app.c - production receiver (see DEVELOPMENT/receiver/README.md
+ * and DEVELOPMENT/radio/README.md)
+ *
+ * Feeds the REAL receiver safety state machine from the actual nRF24L01+
+ * radio link instead of breadboard buttons/a pot (compare
+ * DEVELOPMENT/receiver/firmware/Src/bench_app.c, the bench rig's version of
+ * this same #include pattern), and drives real HAL calls for the servo/
+ * LED/relay/accessory outputs that receiver_firmware.c only stubs out.
+ *
+ * src/receiver/receiver_firmware.c is pulled in below via #include and is
+ * NOT modified for this board beyond three small, reviewed exceptions made
+ * upstream in that file itself (not here):
+ *   - millis() calls HAL_GetTick() when USE_HAL_DRIVER is defined (already
+ *     true for the bench rig too - a hardware wrapper, not a safety-logic
+ *     change).
+ *   - read_local_start_button() and read_battery_mv() read the real
+ *     GPIO/ADC when RECEIVER_PROD_BOARD is defined (only true here, not on
+ *     the bench rig). Both are genuine inputs the safety/battery logic
+ *     directly calls and depends on, unlike the purely-output stubs below
+ *     which this file drives externally instead by observing already-
+ *     decided state (g_state, g_current_servo_throttle, g_batt_low, ...).
+ *   - apply_aux_outputs() stores into g_aux1_state/g_aux2_state so this
+ *     file can read the latest commanded accessory state independent of
+ *     packet arrival, same externally-observed pattern as everything else.
+ *
+ * Everything else in receiver_firmware.c - on_packet_received(),
+ * handle_valid_packet(), watchdog_tick(), start_tick(), crank_tick(),
+ * step_toward_target(), the state machine globals - is used exactly as
+ * shipped, because #include-ing the .c file puts all of it, `static` or
+ * not, into this same translation unit.
+ * ------------------------------------------------------------------- */
+
+#include "prod_app.h"
+#include "main.h"
+#include "adc.h"
+#include "spi.h"
+#include "tim.h"
+
+#include "nrf24.c"
+
+#define RECEIVER_PROD_BOARD
+#include "receiver_firmware.c"
+
+/* --- Radio --- */
+static nrf24_handle_t g_radio;
+
+/* --- Ingestion: real nRF24L01+ payload -> the actual validation path.
+ * Polled every call, no rate limit needed - a FIFO_STATUS check is a cheap
+ * 2-byte SPI transaction, same as the bring-up RX role's tight polling
+ * loop (DEVELOPMENT/radio/spi-bringup/), which worked fine unthrottled. */
+static void prod_ingestion_tick(void) {
+    if (!nrf24_rx_available(&g_radio)) {
+        return;
+    }
+    uint8_t raw[PACKET_SIZE];
+    nrf24_read_payload(&g_radio, raw, PACKET_SIZE);
+    on_packet_received(raw, PACKET_SIZE); /* real sync/CRC/sequence validation */
+}
+
+/* --- Actuation: servo PWM, tri-color LED, kill relay, starter relay,
+ * accessory outputs. See prod_app.h for the full LED behavior writeup. --- */
+#define SERVO_PULSE_MIN_US   1000u
+#define SERVO_PULSE_MAX_US   2000u
+#define HEARTBEAT_PERIOD_MS           200u
+#define HEARTBEAT_PERIOD_LOW_BATT_MS  100u
+
+static throttle_state_t g_prod_last_state = STATE_IDLE_SAFE;
+static uint32_t g_prod_last_seen_cooldown_until = 0;
+
+static void prod_actuation_tick(uint32_t now) {
+    /* Servo: read the already-rate-limited/ramped global, same value the
+     * real firmware would hand to its own set_servo_throttle() stub - see
+     * docs/OPEN-ITEMS.md "Servo PWM mapping" for the SG90-placeholder note
+     * on these two constants. */
+    uint32_t pulse_us = SERVO_PULSE_MIN_US +
+        ((uint32_t)g_current_servo_throttle * (SERVO_PULSE_MAX_US - SERVO_PULSE_MIN_US)) / 255u;
+    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, pulse_us);
+
+    /* Kill relay: energize-to-kill (see docs/OPEN-ITEMS.md "Kill driver") -
+     * refreshed every tick from g_state, not just on the KILL edge, so a
+     * missed/glitched write self-corrects on the next tick. This is the
+     * ELECTRONIC kill path, separate from and in addition to the hardwired
+     * mechanical master kill switch (see receiver_firmware.c's file header
+     * note - that one is intentionally absent from all firmware). */
+    HAL_GPIO_WritePin(KILL_RELAY_GPIO_Port, KILL_RELAY_Pin,
+                       (g_state == STATE_KILLED) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+
+    /* Starter relay: same continuous-refresh approach, energized only while
+     * actively cranking - mirrors the belt-and-suspenders safety net already
+     * in the control tick below (set_starter(false) whenever
+     * g_state != STATE_STARTING), just driving real hardware instead of
+     * that stub. */
+    HAL_GPIO_WritePin(STARTER_RELAY_GPIO_Port, STARTER_RELAY_Pin,
+                       (g_state == STATE_STARTING) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+
+    /* Accessory outputs: mirror the latest commanded state, stored by
+     * apply_aux_outputs() into g_aux1_state/g_aux2_state. */
+    HAL_GPIO_WritePin(AUX1_OUT_GPIO_Port, AUX1_OUT_Pin, g_aux1_state ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(AUX2_OUT_GPIO_Port, AUX2_OUT_Pin, g_aux2_state ? GPIO_PIN_SET : GPIO_PIN_RESET);
+
+    /* Green: engine-running proxy - same rule as the bench rig's LED_GREEN
+     * (see its bench_actuation_tick() for the original). Lit only on a
+     * VOLUNTARY release from STATE_STARTING, never a forced stop; the only
+     * way to tell the two apart from here is g_starter_cooldown_until_ms
+     * (another static pulled in via the #include above) - end_crank() only
+     * sets it on a forced stop. */
+    if (g_state != g_prod_last_state) {
+        if (g_state == STATE_KILLED || g_state == STATE_STARTING) {
+            HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+        } else if (g_prod_last_state == STATE_STARTING && g_state == STATE_IDLE_SAFE) {
+            bool forced_stop = (g_starter_cooldown_until_ms != g_prod_last_seen_cooldown_until) &&
+                                ((int32_t)(g_starter_cooldown_until_ms - now) > 0);
+            if (!forced_stop) {
+                HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+            }
+        }
+        g_prod_last_state = g_state;
+    }
+    g_prod_last_seen_cooldown_until = g_starter_cooldown_until_ms;
+
+    /* Blue: cranking. */
+    HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin,
+                       (g_state == STATE_STARTING) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+}
+
+static void prod_heartbeat_tick(uint32_t now) {
+    static uint32_t last_toggle_ms = 0;
+    static bool on = false;
+
+    if (g_state == STATE_KILLED) {
+        HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+        on = true; /* so the next non-killed tick's toggle starts from a known level */
+        return;
+    }
+
+    uint32_t period_ms = g_batt_low ? HEARTBEAT_PERIOD_LOW_BATT_MS : HEARTBEAT_PERIOD_MS;
+    if ((now - last_toggle_ms) >= period_ms) {
+        last_toggle_ms = now;
+        on = !on;
+        HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, on ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    }
+}
+
+void prod_app_init(void) {
+    HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
+
+    g_radio.hspi     = &hspi1;
+    g_radio.ce_port  = NRF_CE_GPIO_Port;
+    g_radio.ce_pin   = NRF_CE_Pin;
+    g_radio.csn_port = NRF_CSN_GPIO_Port;
+    g_radio.csn_pin  = NRF_CSN_Pin;
+    nrf24_init(&g_radio);
+    nrf24_enter_rx_mode(&g_radio);
+
+    HAL_GPIO_WritePin(KILL_RELAY_GPIO_Port, KILL_RELAY_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(STARTER_RELAY_GPIO_Port, STARTER_RELAY_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(AUX1_OUT_GPIO_Port, AUX1_OUT_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(AUX2_OUT_GPIO_Port, AUX2_OUT_Pin, GPIO_PIN_RESET);
+}
+
+void prod_app_tick(void) {
+    uint32_t now = HAL_GetTick();
+
+    prod_ingestion_tick();
+
+    /* Mirrors receiver_firmware_main()'s independent control tick exactly -
+     * same calls, same order, same once-per-ms gate (that function itself
+     * is never called here; this file is the real entry point, same as
+     * bench_app.c is for the bench rig). */
+    static uint32_t last_control_ms = 0;
+    if (now != last_control_ms) {
+        last_control_ms = now;
+        watchdog_tick();
+        start_tick();
+        crank_tick();
+        if (g_state != STATE_STARTING) {
+            set_starter(false);
+        }
+        if (!g_ramping_to_idle) {
+            step_toward_target(g_target_throttle);
+        }
+        battery_tick();
+    }
+
+    prod_actuation_tick(now);
+    prod_heartbeat_tick(now);
+}
