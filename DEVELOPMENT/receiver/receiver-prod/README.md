@@ -45,12 +45,16 @@ why this works.
   session (see the safety-reviewer-verified fix in
   `src/receiver/receiver_firmware.c`'s git history for the trigger-source
   tracking that closes the loss-of-signal-abort gap).
-- **Not yet tested**: the radio link itself. Board A (`spi-bringup`'s TX
-  role) currently sends a raw incrementing counter, not a real
-  `throttle_packet_t` — `on_packet_received()`'s sync/CRC8/sequence
-  validation will discard it as-is. Needs either a protocol-valid test
-  transmitter or a logic-analyzer-only check that reception is happening at
-  the SPI level (see `DEVELOPMENT/radio/README.md` for the two-board
-  bring-up this reuses).
+- **2026-08-08: Stage 2 confirmed on real hardware — full radio→servo path.**
+  `spi-bringup`'s TX role now sends a real, protocol-valid
+  `throttle_packet_t` (correct sync byte, sequence number, CRC8) with the
+  throttle field slowly triangle-sweeping between idle and a moderate
+  value. Board B's servo visibly tracked the sweep, live over the air —
+  direct confirmation that `on_packet_received()`'s sync→CRC8→sequence
+  validation is passing on real hardware for the first time, and that
+  received throttle correctly flows through the rate-limited
+  `step_toward_target()` path to the servo PWM. This is the first
+  confirmed real-hardware run of the complete radio→validate→throttle→
+  servo chain.
 - **Known, deliberate wiring gaps**: kill relay, starter relay, battery
   sense — see `docs/wiring.md` "Known gaps".
