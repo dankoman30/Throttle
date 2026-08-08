@@ -103,7 +103,14 @@ static bool    g_cruise_engaged = false;
 static uint8_t g_cruise_setpoint = 0;
 static bool    g_cruise_btn_last = false;
 
-static uint8_t bench_apply_cruise(bool cruise_btn_debounced, uint8_t live_throttle, bool kill_active) {
+/* Idle-then-retake escape state - mirrors the same block in
+ * handle_firmware.c's apply_cruise(). Only meaningful while g_cruise_engaged;
+ * reset whenever cruise is not engaged. */
+static bool     g_cruise_idle_last = false;
+static uint32_t g_cruise_idle_since_ms = 0;
+static bool     g_cruise_idle_rearmed = false;
+
+static uint8_t bench_apply_cruise(bool cruise_btn_debounced, uint8_t live_throttle, bool kill_active, uint32_t now) {
     bool rising = cruise_btn_debounced && !g_cruise_btn_last;
     g_cruise_btn_last = cruise_btn_debounced;
 
@@ -123,6 +130,31 @@ static uint8_t bench_apply_cruise(bool cruise_btn_debounced, uint8_t live_thrott
     if (g_cruise_engaged &&
         (int)live_throttle > (int)g_cruise_setpoint + CRUISE_DISENGAGE_THROTTLE_DELTA) {
         g_cruise_engaged = false;
+    }
+
+    /* Idle-then-retake: see the matching comment in handle_firmware.c's
+     * apply_cruise() for the full reasoning (same threshold both directions
+     * so arming alone can never trigger the cancel, only a genuine
+     * subsequent move can). */
+    if (g_cruise_engaged) {
+        bool idle_now = live_throttle <= CRUISE_REARM_THROTTLE_THRESHOLD;
+        if (idle_now && !g_cruise_idle_last) {
+            g_cruise_idle_since_ms = now;
+            g_cruise_idle_rearmed = false;
+        }
+        g_cruise_idle_last = idle_now;
+
+        if (idle_now && !g_cruise_idle_rearmed &&
+            (now - g_cruise_idle_since_ms) >= CRUISE_IDLE_REARM_DELAY_MS) {
+            g_cruise_idle_rearmed = true;
+        }
+
+        if (g_cruise_idle_rearmed && !idle_now) {
+            g_cruise_engaged = false;
+        }
+    } else {
+        g_cruise_idle_last = false;
+        g_cruise_idle_rearmed = false;
     }
 
     return g_cruise_engaged ? g_cruise_setpoint : live_throttle;
@@ -148,7 +180,7 @@ static void bench_ingestion_tick(uint32_t now) {
     uint32_t raw_adc = HAL_ADC_GetValue(&hadc1);
     uint8_t live_throttle = (uint8_t)((raw_adc * 255u) / 4095u);
 
-    uint8_t throttle = bench_apply_cruise(cruise_db, live_throttle, kill_db);
+    uint8_t throttle = bench_apply_cruise(cruise_db, live_throttle, kill_db, now);
 
     throttle_packet_t pkt;
     pkt.sync = PACKET_SYNC_BYTE;

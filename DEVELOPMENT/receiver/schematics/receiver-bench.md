@@ -12,44 +12,77 @@ board mod" in `../docs/wiring.md` for the full explanation and how-to.
 
 ## Block diagram
 
-Pin labels below are **Arduino header label (STM32 pin)** — see
-`../docs/wiring.md` for the full translation table.
+Pin labels below are **Arduino header label / STM32 pin** — see
+`../docs/wiring.md` for the full translation table and resistor-value
+derivations. Renders natively on GitHub and in most Markdown viewers — no
+extra software needed. (An ASCII version of this diagram lived here
+previously; superseded by this Mermaid version, kept in git history if
+ever needed.)
 
-```
-                        +-------------------------------+
-                        |     STM32L432KC Nucleo-32      |
-                        |                                |
-   B103 pot ----------->| A1   (PA1, ADC1_IN6)           |
-   (wiper; ends to       |                                |
-    3V3 / GND)           |                                |
-                        |                                |
-   Start button -------->| A2   (PA3, GPIO in, pull-up)   |
-   (other leg -> GND)    |                                |
-   Cruise button ------->| A3   (PA4, GPIO in, pull-up)   |
-   (other leg -> GND)    |                                |
-   Kill button --------->| A5   (PA6, GPIO in, pull-up)   |
-   (other leg -> GND)    |                                |
-                        |                                |
-                        | A4   (PA5, TIM2_CH1, PWM) ----->|--[orange: servo signal]
-                        |                                |     SG90 servo
-   5V header ----------->|--------------------------------|---> [red: servo V+]
-   GND -----------------> |--------------------------------|---> [brown: servo GND]
-                        |                                |
-                        | A6,D9,D1/TX,D0/RX,D10,D2,D3    |
-                        | (7 x GPIO out, segs a..g) ----->|--[R]--[seg a..g]--+
-                        |                                |                    |
-                        |                                |     common --------+
-                        |                                |     (GND - confirmed
-                        |                                |      common-cathode)
-                        |                                |
-                        | D6   (PB1,  GPIO out) --------->|--[piezo buzzer]--GND
-                        | D12  (PB4,  GPIO out) --------->|--[R]--[LED green]--GND
-                        | D11  (PB5,  GPIO out) --------->|--[R]--[LED red]----GND
-                        | D5   (PB6,  GPIO out) --------->|--[R]--[LED yellow]-GND
-                        | D4   (PB7,  GPIO out) --------->|--[R]--[LED heartbeat]-GND
-                        |                                |
-                        | GND ---------------------------- common ground rail
-                        +-------------------------------+
+```mermaid
+flowchart LR
+    classDef power fill:#3a3a3a,stroke:#888,color:#fff
+    classDef mcu fill:#1f4e79,stroke:#0d2b45,color:#fff
+    classDef input fill:#2e7d32,stroke:#1b4d1e,color:#fff
+    classDef output fill:#8a4b08,stroke:#5c3205,color:#fff
+    classDef passive fill:#555,stroke:#222,color:#fff,stroke-dasharray: 3 3
+
+    V33["3V3 rail"]:::power
+    V5["5V rail"]:::power
+    GND(["GND — common return"]):::power
+
+    subgraph MCU["STM32L432KC Nucleo-32"]
+        direction TB
+        A1["A1 / PA1\nADC1_IN6"]:::mcu
+        A2["A2 / PA3"]:::mcu
+        A3["A3 / PA4"]:::mcu
+        A4["A4 / PA5\nTIM2_CH1 PWM"]:::mcu
+        A5["A5 / PA6"]:::mcu
+        SEGPINS["A6, D9, D1/TX, D0/RX,\nD10, D2, D3\n(segs a-g)"]:::mcu
+        D6["D6 / PB1"]:::mcu
+        D12["D12 / PB4"]:::mcu
+        D11["D11 / PB5"]:::mcu
+        D5PIN["D5 / PB6"]:::mcu
+        D4PIN["D4 / PB7"]:::mcu
+    end
+
+    POT["B103 pot\n10k linear, wiper center"]:::input
+    BTN_START(("Start\nbutton")):::input
+    BTN_CRUISE(("Cruise\nbutton")):::input
+    BTN_KILL(("Kill\nbutton")):::input
+    SERVO["SG90 servo"]:::output
+    SEG["5611AH 7-seg\n(common-cathode)"]:::output
+    BUZZ["Piezo buzzer"]:::output
+    LED_G(("Green LED")):::output
+    LED_R(("Red LED")):::output
+    LED_Y(("Yellow LED")):::output
+    LED_H(("Heartbeat LED")):::output
+    R_G["220-330Ω"]:::passive
+    R_R["220-330Ω"]:::passive
+    R_Y["220-330Ω"]:::passive
+    R_H["220-330Ω"]:::passive
+
+    V33 --- POT
+    GND --- POT
+    POT -- wiper --> A1
+
+    A2 -. "internal pull-up" .-> BTN_START --> GND
+    A3 -. "internal pull-up" .-> BTN_CRUISE --> GND
+    A5 -. "internal pull-up" .-> BTN_KILL --> GND
+
+    A4 -- "orange: signal" --> SERVO
+    V5 -- "red: V+" --> SERVO
+    SERVO -- "brown: GND" --> GND
+
+    SEGPINS -- "7x 150-220Ω\n(one per segment)" --> SEG
+    SEG -- "common cathode" --> GND
+
+    D6 -- click/pop --> BUZZ --> GND
+
+    D12 --> R_G --> LED_G --> GND
+    D11 --> R_R --> LED_R --> GND
+    D5PIN --> R_Y --> LED_Y --> GND
+    D4PIN --> R_H --> LED_H --> GND
 ```
 
 **Remove the factory spare jumper cap between GND and D2 first** — it's

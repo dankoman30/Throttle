@@ -21,8 +21,55 @@ resent every packet, so a brief press produces a sustained stream (see
 `docs/decisions/0004-cruise-on-handle.md` neighbor rationale and
 `src/handle/handle_firmware.c`).
 
-## Open question
+## Addendum (2026-08-02): one-way vs. two-way link reconsidered, and resolved
 
-Whether **kill specifically** should get a confirmed-delivery path is still open
-(tracked in `docs/OPEN-ITEMS.md`). The mechanical kill line is the ultimate
-backup regardless.
+Revisited whether to make the link bidirectional — both for confirmed delivery
+on the control uplink (this ADR's original open question) and, separately, for
+a receiver→handle telemetry downlink (receiver battery, receiver state,
+current throttle position — none of which currently reach the pilot).
+
+**These are two separate questions, not one "go 2-way" decision:**
+confirmed-delivery control and best-effort telemetry have very different risk
+profiles, and treating them as a single bidirectional-vs-not choice was the
+wrong frame.
+
+**Control uplink: stays one-way and unacked. Decision made — not revisiting
+without new bench evidence.**
+- Kill's original open question is answered **no**. Kill is already latched +
+  resent every packet, so a brief press already survives arbitrary packet
+  loss on its own; ACK only helps in the fully-dead-link case, and if the
+  link is fully dead there's no ACK coming back either — that case is already
+  covered by the independent mechanical kill line, with zero radio and zero
+  power required. ACK doesn't close a gap that isn't already closed two other
+  ways.
+- `radio.write()` with auto-ack enabled **blocks until it gets an ACK back or
+  exhausts its retries**. Under the ignition-EMI condition ADR 0005 already
+  names as the dominant reliability threat, that's exactly when ACKs are
+  least likely to come back cleanly — so auto-ack would mean *more* blocking
+  and retrying precisely when the link is already stressed. Today a lost
+  packet costs nothing (the next one supersedes it in ~12.5ms regardless);
+  with auto-ack, a lost packet can stall the sender. That's a regression on
+  the exact axis this ADR already optimized for, in the one file (the
+  handle's send path feeding into the receiver's safety state machine) that
+  should change the least.
+
+**Telemetry downlink: worth pursuing, but as a separate, deferred,
+structurally-isolated feature — not part of first radio bring-up.**
+- The gap is real: receiver battery level and receiver state currently have
+  no path to the pilot at all — the battery LED bar and buzzer live at the
+  receiver, mounted next to the engine, not somewhere a pilot in flight can
+  reliably see or hear over engine noise.
+- If/when built: strictly one-way (receiver → handle), a separate packet
+  type/pipe from control, and architected so the handle's 80Hz control-send
+  loop stays authoritative — it only opportunistically listens for telemetry
+  in slack time, never at the cost of a control packet going out on schedule.
+  Telemetry loss or staleness must be purely cosmetic on the handle's
+  display; it must be structurally impossible for a telemetry hiccup to
+  delay, corrupt, or gate a throttle/kill/start command. `receiver_firmware.c`
+  has no concept of a return link today, and should stay that way regardless
+  of what the handle later does with telemetry — telemetry must be layered
+  on top, never routed through the existing control/state-machine code path.
+- Also has a real handle-side battery-life cost (periodic RX duty cycle vs.
+  today's send-only handle radio) worth sizing before committing.
+- Deferred until after the primary control link (RF24 HAL port, both bench
+  rigs radio-verified) is working. Tracked in `docs/OPEN-ITEMS.md`.

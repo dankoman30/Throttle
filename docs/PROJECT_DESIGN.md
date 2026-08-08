@@ -53,10 +53,22 @@ Per-packet validation order (discard entirely if any step fails):
 3. Sequence number check (must be newer, accounting for 0–255 rollover)
 
 Per-packet command handling order (kill always checked first):
-1. **Kill** — if set, cut ignition immediately, → `KILLED`, ignore rest of packet
+1. **Kill** — if set, cut ignition immediately, → `KILLED`, ignore rest of packet, also clears the latest recorded wireless start-request
 2. **Killed state is sticky** — only a physical/mechanical re-arm can clear it, no wireless command can
-3. **Start** — only actionable from `IDLE_SAFE`, only if packet throttle ≤ idle threshold, only if link isn't in post-loss recovery window
+3. **Start** — the packet handler only records the latest wireless start-request flag here; the actual gating and state transition happen independently of packet arrival (below), in `start_tick`, so a local start button at the receiver (ground-crew override, added 2026-08-07) also works with zero wireless packets ever received
 4. **Throttle** — applied only if not in post-loss recovery window, rate-limited per tick
+
+**Start gating (`start_tick`, independent of packet arrival, like the watchdog below):**
+combines the latest wireless flag with a debounced local start button into one
+signal, edge-triggers the crank start/stop off it — only actionable from
+`IDLE_SAFE`, only at idle throttle, only outside the post-loss recovery
+window, not during starter cooldown. Whichever crank begins records whether
+wireless was involved in triggering it; the crank's own loss-of-signal abort
+(part of the max-crank bounding logic) checks that recorded source rather
+than the local button's live reading, so a stuck/faulty local button can't
+silently defeat the fast abort for a wireless-triggered crank. There is
+deliberately no local kill button — the unit's hardwired master kill switch
+fills that role, same as the mechanical kill line described below.
 
 ## Watchdog / Loss-of-Signal Logic
 Runs independently of packet reception, on its own timer:
@@ -92,6 +104,8 @@ it in the air.
 | `KILL_DEBOUNCE_MS` | 30 | How long the kill line must read "kill" continuously before it latches | Kill is wired fail-safe, so this never defeats a genuine press or a severed wire — only delays recognizing it slightly. Higher rejects more vibration/contact-bounce glitches; lower reacts faster to a real kill. |
 | `INPUT_DEBOUNCE_MS` | 20 | Debounce window for cruise + accessory inputs | Higher rejects more bounce; lower is more responsive but risks a single press registering as multiple toggles. |
 | `CRUISE_DISENGAGE_THROTTLE_DELTA` | 10 (0–255 units) | How far the trigger must move above the frozen cruise setpoint before cruise disengages | Higher tolerates a light bump on the trigger while cruising; lower disengages cruise more readily on any throttle movement. |
+| `CRUISE_REARM_THROTTLE_THRESHOLD` | 8 (0–255 units) | Third cruise-disengage path: counts as "neutral" (to start the hold below) and as "real input" (to actually cancel) — same value both directions, see ADR 0004's 2026-08-03 addendum for why | Higher makes both the neutral-detection and the retake-sensitivity more lenient; lower requires the pilot to release further and move more deliberately to trigger either half. |
+| `CRUISE_IDLE_REARM_DELAY_MS` | 2000 | How long the trigger must sit continuously at/below `CRUISE_REARM_THROTTLE_THRESHOLD` (cruise engaged) before the next input above it cancels cruise | Any dip back above the threshold during the wait resets this timer. Higher makes the escape harder to trigger by accident (or on a longer intentional pause); lower makes it more readily available. |
 
 ### Manual crank bounds (`throttle_protocol.h`, receiver-only; see ADR 0007)
 

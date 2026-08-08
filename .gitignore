@@ -1,10 +1,18 @@
-# STM32CubeIDE build output
-DEVELOPMENT/**/firmware/Debug/
-DEVELOPMENT/**/firmware/Release/
+# STM32CubeIDE build output (any project under DEVELOPMENT, not just ones named "firmware")
+DEVELOPMENT/**/Debug/
+DEVELOPMENT/**/Release/
 
 # STM32CubeIDE local project preferences (machine-local, not shared config)
 **/.settings/stm32cubeide.project.prefs
+**/.settings/com.st.stm32cube.ide.mcu.sfrview.prefs
 
 # Claude Code session screenshots (not repo content)
 .claude/screenshots/
-DEVELOPMENT/receiver/firmware/.settings/com.st.stm32cube.ide.mcu.sfrview.prefs
+
+# KiCad local project state / generated reports (machine-local, not shared config)
+DEVELOPMENT/**/kicad/**/*.kicad_prl
+DEVELOPMENT/**/kicad/**/*.lck
+DEVELOPMENT/**/kicad/**/ERC.rpt
+
+# Editor local-history auto-backups (not repo content, has its own nested .git)
+**/.history/

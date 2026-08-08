@@ -22,7 +22,10 @@
 
 /* --- Hardware handles (fill in during board bring-up) --- */
 // extern ADC_HandleTypeDef hadc1;         /* trigger position input */
-// extern RF24 radio;                       /* nRF24L01+ instance (RF24 library) */
+// extern nrf24_handle_t g_radio;           /* nRF24L01+ instance - see src/common/nrf24.h.
+//                                              Pin assignment not yet finalized (no real handle
+//                                              board project exists yet - DEVELOPMENT/radio/ only
+//                                              covers bring-up boards so far). */
 // GPIO defines for kill switch input, start button input
 
 /* Generic time-based debounce for momentary/rocker inputs: the raw reading must
@@ -71,6 +74,12 @@ static uint32_t  g_kill_active_since_ms = 0;
 static bool      g_cruise_engaged = false;
 static uint8_t   g_cruise_setpoint = 0;
 static bool      g_cruise_button_last = false;
+
+/* Idle-then-retake escape state (see apply_cruise). Only meaningful while
+ * g_cruise_engaged; reset whenever cruise is not engaged. */
+static bool      g_cruise_idle_last = false;    /* was throttle at/below the rearm threshold last tick */
+static uint32_t  g_cruise_idle_since_ms = 0;     /* when throttle most recently arrived at/below it */
+static bool      g_cruise_idle_rearmed = false;  /* continuous hold satisfied; next real move cancels cruise */
 
 /* Debounce state for the cruise button and the two accessory inputs. */
 static debounce_t g_cruise_btn_db;
@@ -188,12 +197,27 @@ static bool read_aux2_switch(void) { /* e.g. smoke: closed = on */
  *   - Engaging captures the current trigger position as the setpoint; while
  *     engaged we transmit that frozen value instead of the live trigger, so
  *     the pilot can release the trigger and the throttle holds.
- *   - Cruise drops on: kill (always), a second button press, or the pilot
- *     pulling the trigger ABOVE the setpoint by more than
- *     CRUISE_DISENGAGE_THROTTLE_DELTA (an override to take manual control /
- *     accelerate). Releasing the trigger BELOW the setpoint is exactly what
- *     cruise is for and does NOT disengage - that's how the pilot rests their
- *     hand. To reduce throttle, press the cruise button or kill.
+ *   - Cruise drops on any of three independent paths:
+ *       1. kill (always), or a second button press.
+ *       2. the pilot pulling the trigger ABOVE the setpoint by more than
+ *          CRUISE_DISENGAGE_THROTTLE_DELTA (an override to take manual
+ *          control / accelerate).
+ *       3. idle-then-retake: the trigger held continuously at/below
+ *          CRUISE_REARM_THROTTLE_THRESHOLD for CRUISE_IDLE_REARM_DELAY_MS,
+ *          followed by any move back above that threshold. Lets the pilot
+ *          simply let go and retake the trigger to get manual control back,
+ *          without pulling past the setpoint or hunting for the cruise
+ *          button. The 2s continuous-hold requirement (any dip back above
+ *          the threshold during the wait resets it) distinguishes a
+ *          deliberate release from a brief dip, and reusing the same
+ *          threshold both directions means the hold timer can only ever
+ *          finish while throttle is still at/below it - so becoming armed
+ *          can never by itself trigger the cancel, only a genuine
+ *          subsequent move can.
+ *     Merely releasing the trigger below the setpoint and holding it there
+ *     indefinitely is exactly what cruise is for and does NOT disengage on
+ *     its own - path 3 only fires on the pilot's next actual input after the
+ *     hold, not from resting at idle.
  * Returns the throttle value that should actually be transmitted this packet.
  * Kill must be evaluated (g_kill_latched set) BEFORE calling this. */
 static uint8_t apply_cruise(uint8_t live_throttle, uint32_t now) {
@@ -221,6 +245,27 @@ static uint8_t apply_cruise(uint8_t live_throttle, uint32_t now) {
         if ((int)live_throttle > (int)g_cruise_setpoint + CRUISE_DISENGAGE_THROTTLE_DELTA) {
             g_cruise_engaged = false;       /* pilot pulled past hold point -> manual */
         }
+    }
+
+    if (g_cruise_engaged) {
+        bool idle_now = live_throttle <= CRUISE_REARM_THROTTLE_THRESHOLD;
+        if (idle_now && !g_cruise_idle_last) {
+            g_cruise_idle_since_ms = now;   /* just arrived at neutral - (re)start the hold timer */
+            g_cruise_idle_rearmed = false;
+        }
+        g_cruise_idle_last = idle_now;
+
+        if (idle_now && !g_cruise_idle_rearmed &&
+            (now - g_cruise_idle_since_ms) >= CRUISE_IDLE_REARM_DELAY_MS) {
+            g_cruise_idle_rearmed = true;
+        }
+
+        if (g_cruise_idle_rearmed && !idle_now) {
+            g_cruise_engaged = false;       /* pilot retook the trigger -> manual */
+        }
+    } else {
+        g_cruise_idle_last = false;
+        g_cruise_idle_rearmed = false;
     }
 
     return g_cruise_engaged ? g_cruise_setpoint : live_throttle;
@@ -284,7 +329,7 @@ static void build_and_send_packet(void) {
 
     pkt.crc8 = crc8_compute((const uint8_t *)&pkt, PACKET_CRC_LEN);
 
-    // radio.write(&pkt, PACKET_SIZE);  /* RF24 library call */
+    // nrf24_send_payload(&g_radio, (const uint8_t *)&pkt, PACKET_SIZE);
 }
 
 /* --- Local battery monitor (transmitter side) ---
@@ -325,15 +370,17 @@ int handle_firmware_main(void) {
      * SystemClock_Config();
      * MX_ADC1_Init();
      * MX_GPIO_Init();
-     * radio.begin();
-     * radio.setPALevel(RF24_PA_HIGH);
-     * radio.setDataRate(RF24_250KBPS);   // favor range/reliability over throughput here
-     * radio.setChannel(...);              // pick a clear channel, consider scanning on boot
-     * radio.setAutoAck(false);            // we don't need ack for this use case; sending fast
-     *                                      // and relying on sequence numbers + watchdog is simpler
-     *                                      // and avoids ack-related latency. Reconsider if you want
-     *                                      // confirmed delivery for kill specifically.
-     * radio.stopListening();              // handle only transmits
+     * MX_SPI1_Init();                      // + assign g_radio's hspi/CE/CSN pins here
+     * nrf24_init(&g_radio);                 // EN_AA off (ADR 0001), PA_HIGH, static payload -
+     *                                       // see src/common/nrf24.h. Channel/address are still
+     *                                       // bring-up placeholders (docs/OPEN-ITEMS.md "Channel
+     *                                       // selection"), and RF_SETUP defaults to 1Mbps as a
+     *                                       // bring-up diagnostic finding, not a final data-rate
+     *                                       // decision - see docs/decisions/0005-radio-choice-
+     *                                       // and-ignition-emi.md's 2026-08-06 addendum.
+     *                                       // nrf24_init() already leaves the chip ready to
+     *                                       // transmit (PTX, CE low) - handle needs no further
+     *                                       // mode call.
      */
 
     uint32_t last_tx = millis();

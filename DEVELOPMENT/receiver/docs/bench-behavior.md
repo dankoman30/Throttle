@@ -37,7 +37,7 @@ PWM, display, buzzer, LEDs — is new, bench-only code in `bench_app.c`.
 |---|---|
 | **Kill button** | Debounced over `KILL_DEBOUNCE_MS` (own dedicated window, mirroring the handle's `kill_confirmed()`). Debounced level sets `CMD_FLAG_KILL` in every packet while held/latched-conceptually — but **latching itself happens in the receiver** (`g_state -> STATE_KILLED`), not in the bench code. Once latched: sticky, red LED on, buzzer beeps once on entry, display blinks 0. **Re-arm = power-cycle or press the Nucleo's reset button** — no button or packet field clears it, matching production. |
 | **Start button** | Debounced (`INPUT_DEBOUNCE_MS`) then gated by a `START_HOLD_REQUIRED_MS` hold timer mirroring `start_request_confirmed()`. Once hold-confirmed, `CMD_FLAG_START_REQ` is asserted — the receiver's own independent gate (`IDLE_SAFE` state, throttle ≤ `IDLE_THRESHOLD_FOR_START` (15/255, ~6%), not recovering from loss) still applies on top, and **only guards entering `STATE_STARTING`** — it is not re-checked once cranking. While cranking: yellow LED on, servo tracks `g_target_throttle` live, same as any other state (see the pot row below) — the pot is not frozen or ignored during a crank, so the pilot can crack the throttle open mid-crank to help a cold engine catch. Crank ends on release (voluntary) or a forced stop (`MAX_CRANK_MS` backstop or `CRANK_LOSS_ABORT_MS` loss-of-signal abort, both inside the real `crank_tick()`). |
-| **Cruise button** | Debounced (`INPUT_DEBOUNCE_MS`), then a small local mirror of the handle's `apply_cruise()` (rising edge toggles, freezes the pot reading as setpoint, disengages on kill or pulling the pot more than `CRUISE_DISENGAGE_THROTTLE_DELTA` above the setpoint). This runs in `bench_app.c`, not the receiver — matches how cruise is resolved on the real handle and is transparent to the receiver. |
+| **Cruise button** | Debounced (`INPUT_DEBOUNCE_MS`), then a small local mirror of the handle's `apply_cruise()` (rising edge toggles, freezes the pot reading as setpoint). Disengages on: kill, a second press, pulling the pot more than `CRUISE_DISENGAGE_THROTTLE_DELTA` above the setpoint, or the idle-then-retake escape — pot held continuously at/below `CRUISE_REARM_THROTTLE_THRESHOLD` for `CRUISE_IDLE_REARM_DELAY_MS` (2s), then moved back above that same threshold (see the addendum in `docs/decisions/0004-cruise-on-handle.md` for why one shared threshold, not two). This runs in `bench_app.c`, not the receiver — matches how cruise is resolved on the real handle and is transparent to the receiver. |
 | **Pot (throttle)** | Scaled 0–4095 (12-bit ADC) → 0–255, fed either live or frozen (if cruise engaged) into the packet's `throttle` field on *every* ingestion tick. In the receiver, `handle_valid_packet()` applies `pkt->throttle` to `g_target_throttle` unconditionally once past the kill/killed checks (`receiver_firmware.c`, the THROTTLE step) — state (`IDLE_SAFE` or `STARTING`) doesn't gate it, only `g_recovering_from_loss` does. So the pot stays live through a crank; only the *start* button's rising edge additionally requires throttle ≤ `IDLE_THRESHOLD_FOR_START` at that instant. |
 
 Every ingestion tick builds a real `throttle_packet_t` (incrementing `seq`,
@@ -101,6 +101,16 @@ SB16/SB18 removed, see `wiring.md`:
       freezes the servo at that setpoint even after releasing the pot to
       idle; pushing the pot well past the setpoint disengages it; pressing
       cruise again disengages it too.
+- [ ] **Idle-then-retake escape (added 2026-08-03, not yet bench-verified):**
+      with cruise engaged, turn the pot down to at/below
+      `CRUISE_REARM_THROTTLE_THRESHOLD` (~8/255) and hold it there. Confirm
+      the servo *stays* at the frozen setpoint (does not drop to idle) for
+      the first `CRUISE_IDLE_REARM_DELAY_MS` (2s) — turning the pot up
+      *before* the 2s mark should have no effect on cruise. After the 2s
+      mark, the very next pot movement above the threshold should disengage
+      cruise immediately, with the servo following the pot live from that
+      point on. Also confirm: sitting at idle indefinitely past the 2s mark
+      *without* moving the pot again does **not** disengage on its own.
 - [x] Pressing kill: red on, buzzer beeps, servo goes to idle, display
       blinks. Releasing kill and sending more packets does **not** clear it.
       Only a reset/power-cycle re-arms.
