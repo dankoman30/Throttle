@@ -1,5 +1,9 @@
 # DEVELOPMENT/receiver — bench rig (no radio yet)
 
+**This doc covers the bench rig (`firmware/`) specifically.** For the
+production receiver (real radio/servo/relays, not breadboard simulation),
+see `receiver-prod/README.md`.
+
 Runs the **real** receiver safety state machine
 (`src/receiver/receiver_firmware.c`, completely unmodified) on an
 STM32L432KC (Nucleo-32), fed by breadboard buttons and a potentiometer
