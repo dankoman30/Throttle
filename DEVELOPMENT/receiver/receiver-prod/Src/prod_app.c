@@ -22,13 +22,15 @@
  *     directly calls and depends on, unlike the purely-output stubs below
  *     which this file drives externally instead by observing already-
  *     decided state (g_state, g_current_servo_throttle, g_batt_low, ...).
- *   - apply_aux_outputs() stores into g_aux1_state/g_aux2_state so this
- *     file can read the latest commanded accessory state independent of
- *     packet arrival, same externally-observed pattern as everything else.
- *     (AUX2 was removed 2026-08-08 to save a pin on the handle, then
- *     restored 2026-08-09 once pins freed up elsewhere - AUX2_OUT/PA10 was
- *     never actually un-assigned in CubeMX, so no pin changes were needed
- *     here, just the code path.)
+ *   - apply_aux_outputs() stores into g_aux1_state/g_aux2_state/
+ *     g_cruise_active so this file can read the latest commanded/observed
+ *     state independent of packet arrival, same externally-observed
+ *     pattern as everything else. (AUX2 was removed 2026-08-08 to save a
+ *     pin on the handle, then restored 2026-08-09 once pins freed up
+ *     elsewhere - AUX2_OUT/PA10 was never actually un-assigned in CubeMX,
+ *     so no pin changes were needed here, just the code path. g_cruise_active
+ *     is purely informational for the cruise indicator LED - see that
+ *     global's comment in receiver_firmware.c.)
  *
  * Everything else in receiver_firmware.c - on_packet_received(),
  * handle_valid_packet(), watchdog_tick(), start_tick(), crank_tick(),
@@ -43,6 +45,7 @@
 #include "spi.h"
 #include "tim.h"
 
+#include "led_blink.h"
 #include "nrf24.c"
 
 #define RECEIVER_PROD_BOARD
@@ -64,15 +67,10 @@ static void prod_ingestion_tick(void) {
     on_packet_received(raw, PACKET_SIZE); /* real sync/CRC/sequence validation */
 }
 
-/* --- Actuation: servo PWM, tri-color LED, kill relay, starter relay,
+/* --- Actuation: servo PWM, status LED, kill relay, starter relay,
  * accessory outputs. See prod_app.h for the full LED behavior writeup. --- */
 #define SERVO_PULSE_MIN_US   1000u
 #define SERVO_PULSE_MAX_US   2000u
-#define HEARTBEAT_PERIOD_MS           200u
-#define HEARTBEAT_PERIOD_LOW_BATT_MS  100u
-
-static throttle_state_t g_prod_last_state = STATE_IDLE_SAFE;
-static uint32_t g_prod_last_seen_cooldown_until = 0;
 
 static void prod_actuation_tick(uint32_t now) {
     /* Servo: read the already-rate-limited/ramped global, same value the
@@ -104,48 +102,66 @@ static void prod_actuation_tick(uint32_t now) {
      * apply_aux_outputs() into g_aux1_state/g_aux2_state. */
     HAL_GPIO_WritePin(AUX1_OUT_GPIO_Port, AUX1_OUT_Pin, g_aux1_state ? GPIO_PIN_SET : GPIO_PIN_RESET);
     HAL_GPIO_WritePin(AUX2_OUT_GPIO_Port, AUX2_OUT_Pin, g_aux2_state ? GPIO_PIN_SET : GPIO_PIN_RESET);
+}
 
-    /* Green: engine-running proxy - same rule as the bench rig's LED_GREEN
-     * (see its bench_actuation_tick() for the original). Lit only on a
-     * VOLUNTARY release from STATE_STARTING, never a forced stop; the only
-     * way to tell the two apart from here is g_starter_cooldown_until_ms
-     * (another static pulled in via the #include above) - end_crank() only
-     * sets it on a forced stop. */
+/* Running-proxy latch: same rule as before - lit only on a VOLUNTARY
+ * release from STATE_STARTING, never a forced stop; the only way to tell
+ * the two apart from here is g_starter_cooldown_until_ms (a static pulled
+ * in via the #include above) - end_crank() only sets it on a forced stop.
+ * Read by prod_status_led_tick() below; not written straight to a HAL call
+ * itself so it can also gate the heartbeat (see prod_app.h). */
+static throttle_state_t g_prod_last_state = STATE_IDLE_SAFE;
+static uint32_t g_prod_last_seen_cooldown_until = 0;
+static bool g_prod_running_proxy = false;
+
+static void prod_update_running_proxy(uint32_t now) {
     if (g_state != g_prod_last_state) {
         if (g_state == STATE_KILLED || g_state == STATE_STARTING) {
-            HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+            g_prod_running_proxy = false;
         } else if (g_prod_last_state == STATE_STARTING && g_state == STATE_IDLE_SAFE) {
             bool forced_stop = (g_starter_cooldown_until_ms != g_prod_last_seen_cooldown_until) &&
                                 ((int32_t)(g_starter_cooldown_until_ms - now) > 0);
             if (!forced_stop) {
-                HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+                g_prod_running_proxy = true;
             }
         }
         g_prod_last_state = g_state;
     }
     g_prod_last_seen_cooldown_until = g_starter_cooldown_until_ms;
-
-    /* Blue: cranking. */
-    HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin,
-                       (g_state == STATE_STARTING) ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 
-static void prod_heartbeat_tick(uint32_t now) {
-    static uint32_t last_toggle_ms = 0;
-    static bool on = false;
+/* Status LED (red+green only - see prod_app.h for the full priority
+ * writeup). Kill's long-long and the heartbeat's lub-dub both come from
+ * src/common/led_blink.h so this board's timing is byte-identical to the
+ * handle's. */
+static blink_state_t g_prod_kill_blink = {0, 0};
+static blink_state_t g_prod_heartbeat_blink = {0, 0};
 
+static void prod_status_led_tick(uint32_t now) {
+    prod_update_running_proxy(now);
+
+    bool red = false, green = false;
     if (g_state == STATE_KILLED) {
-        HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
-        on = true; /* so the next non-killed tick's toggle starts from a known level */
-        return;
+        red = blink_pattern_tick(KILL_PATTERN, KILL_PATTERN_LEN, &g_prod_kill_blink, now, 100u);
+    } else if (g_state == STATE_STARTING) {
+        red = true;
+        green = true; /* yellow */
+    } else if (g_prod_running_proxy) {
+        green = true;
+    } else {
+        uint16_t scale = g_batt_low ? 50u : 100u;
+        red = blink_pattern_tick(HEARTBEAT_PATTERN, HEARTBEAT_PATTERN_LEN, &g_prod_heartbeat_blink, now, scale);
     }
 
-    uint32_t period_ms = g_batt_low ? HEARTBEAT_PERIOD_LOW_BATT_MS : HEARTBEAT_PERIOD_MS;
-    if ((now - last_toggle_ms) >= period_ms) {
-        last_toggle_ms = now;
-        on = !on;
-        HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, on ? GPIO_PIN_SET : GPIO_PIN_RESET);
-    }
+    HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, red ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, green ? GPIO_PIN_SET : GPIO_PIN_RESET);
+}
+
+/* Cruise indicator: separate, dedicated LED (physically relocated off the
+ * old tri-color package's blue lead - see docs/wiring.md), reading the
+ * receiver's own g_cruise_active (see receiver_firmware.c). */
+static void prod_cruise_led_tick(void) {
+    HAL_GPIO_WritePin(CRUISE_LED_GPIO_Port, CRUISE_LED_Pin, g_cruise_active ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 
 void prod_app_init(void) {
@@ -163,7 +179,7 @@ void prod_app_init(void) {
     HAL_GPIO_WritePin(STARTER_RELAY_GPIO_Port, STARTER_RELAY_Pin, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(CRUISE_LED_GPIO_Port, CRUISE_LED_Pin, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(AUX1_OUT_GPIO_Port, AUX1_OUT_Pin, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(AUX2_OUT_GPIO_Port, AUX2_OUT_Pin, GPIO_PIN_RESET);
 }
@@ -193,5 +209,6 @@ void prod_app_tick(void) {
     }
 
     prod_actuation_tick(now);
-    prod_heartbeat_tick(now);
+    prod_status_led_tick(now);
+    prod_cruise_led_tick();
 }

@@ -3,17 +3,33 @@
 #ifndef PROD_APP_H
 #define PROD_APP_H
 
-/* Tri-color status LED behavior:
- *   Red   - heartbeat while armed (toggles every ~200ms, or ~100ms if the
- *           receiver's own battery is low - see g_batt_low); solid ON while
- *           STATE_KILLED, overriding the blink entirely.
- *   Green - engine-running proxy, lit only on a VOLUNTARY release from
- *           STATE_STARTING (never a forced stop - loss-of-signal abort or
- *           the MAX_CRANK_MS backstop), off during STARTING/KILLED. Same
- *           rule as the bench rig's separate green LED.
- *   Blue  - on while STATE_STARTING (cranking), off otherwise.
+/* Status LED (red+green only - the tri-color package's blue lead was
+ * dropped 2026-08-09 in favor of a separate, dedicated cruise LED; see
+ * "Cruise indicator" below). Priority order, highest first:
+ *   1. STATE_KILLED       - red, LONG-LONG blink (src/common/led_blink.h's
+ *                            KILL_PATTERN).
+ *   2. STATE_STARTING     - yellow (red+green together), solid.
+ *   3. Running proxy      - green, solid. Latches on a VOLUNTARY release
+ *                            from STATE_STARTING (never a forced stop -
+ *                            loss-of-signal abort or the MAX_CRANK_MS
+ *                            backstop), persists until the next STARTING
+ *                            or KILLED transition. Same rule as the bench
+ *                            rig's separate green LED used to be.
+ *   4. Default (armed,    - red, LUB-DUB heartbeat (HEARTBEAT_PATTERN),
+ *      never yet started)   faster if the receiver's own battery is low
+ *                            (g_batt_low scales the pattern - see
+ *                            prod_status_led_tick()). This is what shows
+ *                            right after boot/re-arm, before any crank has
+ *                            ever completed - not green.
  * Kill and battery-low both wanting the red channel is intentional: kill is
  * the higher-priority signal, so battery status isn't shown while killed.
+ *
+ * Cruise indicator (separate, dedicated LED, physically relocated off the
+ * old tri-color package's blue lead onto its own standalone LED on the
+ * same pin, now labeled CRUISE_LED): solid while g_cruise_active
+ * (receiver_firmware.c), off otherwise. Independent of the state model
+ * above entirely - see DEVELOPMENT/handle/handle-prod/Inc/handle_app.h for
+ * the handle's mirror of this exact model, both status and cruise.
  */
 
 /* Call once from main()'s USER CODE BEGIN 2, after all MX_*_Init() calls. */
