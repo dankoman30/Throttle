@@ -104,6 +104,20 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   between (a) servo on the receiver pack via a dedicated BEC/regulator rail with
   bulk capacitance while MCU+radio sit on a cleaner rail, or (b) a separate servo
   battery. Sized after servo selection.
+  **Current leaning (2026-08-09, not finalized):** receiver + servo on a **2S
+  18650 pack** (7.4–8.4V) through a buck/BEC down to 5V for both the servo
+  and the board; handle on a **single 1S 18650** (3.7–4.2V) through a boost
+  module, since it has no servo and just needs clean 3.3–5V logic power
+  (cheap combined boost+USB-C-charge modules exist for exactly this).
+  Real open sub-questions, not yet resolved:
+  - Whether the Nucleo-32 L432KC's 5V/VIN pins tolerate direct external
+    injection when not USB-powered — needs checking against the datasheet,
+    not assumed.
+  - BEC/boost current sizing depends on the still-unselected servo's
+    stall/running current.
+  - **Runtime target: ≥2 hours of continuous servo operation** — a real
+    sizing constraint for both pack capacity and servo current draw once
+    the servo is picked.
 - [ ] **Receiver battery chemistry/voltage** — pick the receiver pack, then
   replace the placeholder mV values in `RX_BATT` and `read_battery_mv()`'s
   divider scaling with measured values. (Handle-side battery monitoring was
@@ -130,7 +144,31 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   blink rate instead of a dedicated bar/buzzer (see `prod_app.c`). The
   bar/buzzer math in `battery_monitor.h` (`battery_eval`/`battery_buzzer_on`)
   stays as general-purpose, unit-tested logic but isn't wired to real
-  hardware on either board.
+  hardware on either board. The "standalone battery meters" referenced here
+  are now on hand - see the next item.
+- [ ] **Battery capacity indicator modules ordered (2026-08-09).** Two
+  kinds, one for each pack, both purely passive - 2-wire, connected straight
+  across the battery terminals, no GPIO/ADC pins on either board and no
+  firmware involvement at all:
+  - Generic "1-8S universal" module: select the cell-count pad (S1-S8,
+    solder-bridge one only) to match the pack; red 7-segment-style digits,
+    4-level blue/green bar display. 3-34V working range, 5mA draw,
+    -20-50°C. Not waterproof.
+  - DGZZI 1S-specific module: fixed for a single cell (3.7-4.2V), 4-level
+    red/orange/green bar (red ~5%, orange ~50%, green 75-100%). Also not
+    waterproof.
+  - Neither needs a decision before wiring - just connect to whichever pack
+    ends up on each board once "Servo power architecture" above is settled.
+- [ ] **Charging board compatibility (note for purchasing).** 1S and 2S
+  packs need **different** charge modules - not interchangeable. A
+  1S-rated board (e.g. common TP4056-style USB-C modules) caps out around
+  4.2V and will undercharge a 2S pack; a 2S-rated charge board outputs
+  ~8.4V and would overcharge a single cell. Series vs. parallel matters
+  specifically for charging (parallel keeps it single-cell-equivalent
+  voltage; series does not). For the 2S receiver pack, also get a board
+  with a **balance** tap/connector - a plain series-only charger without
+  balancing lets the two cells drift apart in capacity over many cycles,
+  which shortens pack life and risks over-discharging one cell.
 - [x] **Cruise / accessory switch wiring** — momentary pushbuttons for cruise,
   AUX1 (strobe), and AUX2 (smoke), all "closed = on" with pull-downs (kill
   and start are the pull-up exceptions). AUX1 is latched in firmware
