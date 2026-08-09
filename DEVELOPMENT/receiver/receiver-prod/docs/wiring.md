@@ -27,7 +27,7 @@ name)**.
 | Starter relay | D6 | PB1 (`STARTER_RELAY`) | out | **Not yet wired** — see "Known gaps" |
 | Tri-color LED green | D9 | PA8 (`LED_GREEN`) | out | |
 | AUX1 (lights, placeholder LED for now) | D1/TX | PA9 (`AUX1_OUT`) | out | |
-| AUX2 (smoke, placeholder LED for now) | D0/RX | PA10 (`AUX2_OUT`) | out | |
+| AUX2 (smoke, placeholder LED for now) | D0/RX | PA10 (`AUX2_OUT`) | out | Removed 2026-08-08 to save a pin on the handle, restored 2026-08-09 once pins freed up elsewhere on that board — never actually un-assigned here, so no CubeMX changes were needed. |
 | Tri-color LED blue | D10 | PA11 (`LED_BLUE`) | out | |
 | Radio SCK | D13 | PB3 (`SPI1_SCK`) | out | onboard LD3 flickers with SPI clock — harmless |
 | Radio MISO | D12 | PB4 (`SPI1_MISO`) | in | |
@@ -115,15 +115,27 @@ get bumped).
 
 ## AUX1 / AUX2 (accessory outputs)
 
-Eventually these will drive relays for lights/smoke. **For now, wired as
-individual indicator LEDs** just to confirm the circuits are functioning —
-standard LED wiring, same as the tri-color LED's individual channels but
-each with its own cathode-to-GND (these are plain single LEDs, not part of
-the tri-color package):
-- **AUX1 (lights placeholder)**: **D1/TX (PA9)** → resistor (~220–330Ω) →
-  LED anode → LED cathode → GND
-- **AUX2 (smoke placeholder)**: **D0/RX (PA10)** → resistor → LED anode →
-  LED cathode → GND
+**Confirmed working on real hardware 2026-08-09** — both outputs
+correctly track the handle's commanded state (AUX1 latched, AUX2
+momentary) over the radio link.
+
+Eventually these will drive relays (AUX1 a strobe light circuit, AUX2 a
+smoke circuit). **For now, each is wired as an individual indicator LED**
+just to confirm the circuit is functioning — standard LED wiring (a plain
+single LED, not part of the tri-color package):
+
+- AUX1: **D1/TX (PA9)** → resistor (~220–330Ω) → LED anode → LED
+  cathode → GND.
+- AUX2: **D0/RX (PA10)** → resistor (~220–330Ω) → LED anode → LED
+  cathode → GND.
+
+The receiver treats both as plain level flags and doesn't know or care
+that the handle latches AUX1 (toggle on/off) while leaving AUX2 purely
+momentary — see `DEVELOPMENT/handle/handle-prod/docs/wiring.md` for that
+distinction.
+
+(AUX2 was removed 2026-08-08 to save a pin budget on the handle, then
+restored 2026-08-09 once pins freed up elsewhere on that board.)
 
 ## Known gaps — deliberately left unconnected
 

@@ -175,7 +175,8 @@ int main(void) {
     CHECK(!seq_is_newer(200, 5));         /* >127 ahead treated as old/reordered */
     CHECK(seq_is_newer(5, 200));          /* small forward wrap */
 
-    /* --- battery bar mapping (4-LED handle profile) --- */
+    /* --- battery bar mapping (generic 4-LED profile, exercises the shared
+     * battery_monitor.h math used by the receiver) --- */
     battery_profile_t p = { .full_mv = 8400, .empty_mv = 6000, .low_mv = 6600, .led_count = 4 };
     CHECK(battery_eval(9000, &p).leds_lit == 4);   /* above full clamps */
     CHECK(battery_eval(8400, &p).leds_lit == 4);

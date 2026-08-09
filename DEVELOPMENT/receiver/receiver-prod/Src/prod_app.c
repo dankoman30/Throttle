@@ -25,6 +25,10 @@
  *   - apply_aux_outputs() stores into g_aux1_state/g_aux2_state so this
  *     file can read the latest commanded accessory state independent of
  *     packet arrival, same externally-observed pattern as everything else.
+ *     (AUX2 was removed 2026-08-08 to save a pin on the handle, then
+ *     restored 2026-08-09 once pins freed up elsewhere - AUX2_OUT/PA10 was
+ *     never actually un-assigned in CubeMX, so no pin changes were needed
+ *     here, just the code path.)
  *
  * Everything else in receiver_firmware.c - on_packet_received(),
  * handle_valid_packet(), watchdog_tick(), start_tick(), crank_tick(),

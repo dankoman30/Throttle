@@ -37,6 +37,13 @@ why this works.
 
 ## Status
 
+- **2026-08-09: AUX2 restored and confirmed on real hardware.** AUX2/PA10
+  was never actually un-assigned in CubeMX during its 2026-08-08 removal,
+  so restoring it was a code-only change (`apply_aux_outputs()` +
+  `prod_app.c`'s GPIO write). Confirmed tracking the handle's AUX2 level
+  correctly over the radio link, alongside AUX1 (now latched on the
+  handle side, though this receiver treats both identically as plain
+  level flags either way).
 - **2026-08-08: Stage 1 confirmed on real hardware** (standalone, no radio
   link needed) — heartbeat LED blinking, servo settling at idle, and the
   local start button working end-to-end: press → blue LED (cranking),

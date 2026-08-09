@@ -199,25 +199,31 @@ static void start_tick(void) {
     g_start_req_prev = start_req;
 }
 
-/* Accessory outputs (lights, smoke, ...). These are NON-safety and are
- * deliberately kept out of the kill/start/throttle state machine: they simply
- * track their command-flag levels on every valid packet, so a dropped packet
- * only delays a change by one TX period and self-heals. Cruise (CMD_FLAG_CRUISE)
- * needs no action here - the handle already froze the throttle it sent, so the
- * value flows through the normal rate-limited throttle path transparently.
- * Stored into g_aux1_state/g_aux2_state, not just written straight to a HAL
- * call, so a real board's own driver code can read the latest commanded
- * state independent of packet arrival - same externally-observed-state
- * pattern already used for g_state/g_current_servo_throttle elsewhere in
- * this file (see DEVELOPMENT/receiver/firmware/Src/bench_app.c for the
- * precedent). */
+/* Accessory outputs (AUX1 strobe, AUX2 smoke). NON-safety, deliberately
+ * kept out of the kill/start/throttle state machine: each simply tracks
+ * its command-flag level on every valid packet, so a dropped packet only
+ * delays a change by one TX period and self-heals. This receiver doesn't
+ * know or care that the handle latches AUX1 (toggle) and leaves AUX2
+ * purely momentary - both arrive as plain level flags either way. Cruise
+ * (CMD_FLAG_CRUISE) needs no action here - the handle already froze the
+ * throttle it sent, so the value flows through the normal rate-limited
+ * throttle path transparently.
+ * Stored into g_aux1_state/g_aux2_state, not just written straight to a
+ * HAL call, so a real board's own driver code can read the latest
+ * commanded state independent of packet arrival - same
+ * externally-observed-state pattern already used for
+ * g_state/g_current_servo_throttle elsewhere in this file (see
+ * DEVELOPMENT/receiver/firmware/Src/bench_app.c for the precedent).
+ * (AUX2 was removed 2026-08-08 to fit the handle's pin budget, then
+ * restored 2026-08-09 once pins freed up elsewhere - see
+ * docs/OPEN-ITEMS.md.) */
 static bool g_aux1_state = false;
 static bool g_aux2_state = false;
 
 static void apply_aux_outputs(const throttle_packet_t *pkt) {
     g_aux1_state = (pkt->flags & CMD_FLAG_AUX1) != 0;
-    g_aux2_state = (pkt->flags & CMD_FLAG_AUX2) != 0;
     // HAL_GPIO_WritePin(AUX1_OUT_GPIO_Port, AUX1_OUT_Pin, g_aux1_state ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    g_aux2_state = (pkt->flags & CMD_FLAG_AUX2) != 0;
     // HAL_GPIO_WritePin(AUX2_OUT_GPIO_Port, AUX2_OUT_Pin, g_aux2_state ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 

@@ -22,10 +22,13 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
 - [ ] **Tune loss-of-signal watchdog** on the bench: `WATCHDOG_RAMP_START_MS`
   (175), `WATCHDOG_FULL_IDLE_MS` (600), `RAMP_TO_IDLE_DURATION_MS` (400),
   `LINK_RESTORE_STABLE_MS` (300). Current values are starting points.
-- [ ] **Aux-output policy during KILL / loss of signal.** Confirm desired
-  behavior: smoke off when killed and on full signal loss (safety), lights
-  independent. Currently `apply_aux_outputs` mirrors flags after the safety
-  state machine; decide whether smoke must be force-gated in firmware.
+- [x] ~~Aux-output policy during KILL / loss of signal (smoke force-gating)~~ —
+  **resolved: no special policy, by deliberate choice.** AUX2 (smoke) was
+  removed 2026-08-08 then restored 2026-08-09 once pins freed up elsewhere
+  on the handle; revisiting this question on restore, the decision was to
+  keep both AUX1 and AUX2 fully out of the kill/start/throttle state
+  machine - `apply_aux_outputs` mirrors both flags unconditionally, same as
+  before. Not an oversight - discussed and confirmed 2026-08-09.
 - [ ] **Confirm mechanical kill wiring** is independent of the MCU and grounds
   the ignition line with zero power to electronics (backup for a dead radio).
 - [x] ~~`RUNNING` → `IDLE_SAFE` restart policy~~ / ~~RPM START guard not fail-safe~~ —
@@ -51,18 +54,36 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
 
 ## Hardware decisions
 
+- [ ] **Handle kill switch is a bench-test stand-in, not the real part.**
+  `handle-prod` is currently bench-testing with a normally-open switch
+  bridged closed by a jumper wire, purely to unblock testing everything
+  else. This project's fail-safe kill design (ADR 0003) requires a
+  genuinely **normally-closed** switch/contact block - must be swapped
+  before the handle is wired for real. See
+  `DEVELOPMENT/handle/handle-prod/docs/wiring.md` "Kill switch".
 - [ ] **Servo selection** — measure pull force/travel across the full stroke
   **through the full installed cable run** (remote mount adds Bowden friction;
   the bare throttle cable understates it) before ordering (~15–25 kg·cm digital
   metal-gear, continuous-duty ballpark). See ADR 0008. Fish scale ordered
   2026-08-08 for the force measurement, arriving within a day or two.
+  **Prioritize speed/slew rate (deg/sec), second only to safety** - the
+  current SG90 placeholder's own mechanical response is a likely major
+  contributor to the throttle latency observed on the handle-prod bench
+  test (2026-08-09; AUX1, which has no filtering/rate-limit pipeline,
+  responded far faster than the servo-driven throttle). Pick a servo with
+  a genuinely fast rated speed, not just adequate torque - a strong but
+  slow servo would undermine responsiveness even with adequate pull force.
 - [ ] **Remote servo mount + cable run (ADR 0008)** — the servo is frame-mounted,
   not on the engine, and drives the throttle via a push-pull/Bowden cable. To
   design: servo bracket, cable spec + routing (avoid tight bends), and slack/
   end-stops so full servo travel = full throttle stroke. `hardware/mechanical/`.
 - [ ] **Confirm throttle return-to-idle spring** — the carb spring must reliably
   pull to idle when the servo is depowered/failed or the cable detaches (the
-  mechanical fail-safe); verify the linkage can never jam open.
+  mechanical fail-safe); verify the linkage can never jam open. May need a
+  stiffer/different return spring depending on the selected servo's own
+  unpowered ("limp") holding force - a spring sized for one servo's drag
+  might not reliably overcome a different one's. Measure/select together
+  with the servo, not independently.
 - [ ] **Cable tolerance to engine movement** — the engine shifts on its rubber
   mounts relative to the frame; the cable run must flex without binding or
   shifting the throttle setpoint.
@@ -83,9 +104,10 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   between (a) servo on the receiver pack via a dedicated BEC/regulator rail with
   bulk capacitance while MCU+radio sit on a cleaner rail, or (b) a separate servo
   battery. Sized after servo selection.
-- [ ] **Battery chemistry/voltage per pack** — pick handle + receiver packs, then
-  replace placeholder mV values in `HANDLE_BATT` / `RX_BATT` and the
-  `read_battery_mv()` divider scaling with measured values.
+- [ ] **Receiver battery chemistry/voltage** — pick the receiver pack, then
+  replace the placeholder mV values in `RX_BATT` and `read_battery_mv()`'s
+  divider scaling with measured values. (Handle-side battery monitoring was
+  dropped entirely 2026-08-08 - see below - so this is receiver-only now.)
 - [ ] **Engine interface — isolation strategy (decision).** Recommend driving
   kill + starter through **relays or opto-isolated SSRs**, not bare MOSFETs, so
   receiver-ground stays isolated from the noisy engine-ground / starter domain.
@@ -101,9 +123,21 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   feature is added later.
 - [ ] **Connectors** — locking, vibration-rated (JST-SM minimum;
   Deutsch/Amphenol preferred).
-- [ ] **Battery readout wiring** — 3/4-LED bar + piezo buzzer per side.
-- [ ] **Cruise / accessory switch wiring** — momentary (cruise) + rocker/momentary
-  (lights, smoke), all "closed = on" with pull-downs (kill is the exception).
+- [x] ~~Battery readout wiring — 3/4-LED bar + piezo buzzer per side~~ —
+  **superseded 2026-08-08**: the handle has no onboard battery sense at all
+  now (standalone battery meters on the packs themselves, not wired to the
+  board); the receiver folds low-battery into its tri-color status LED's
+  blink rate instead of a dedicated bar/buzzer (see `prod_app.c`). The
+  bar/buzzer math in `battery_monitor.h` (`battery_eval`/`battery_buzzer_on`)
+  stays as general-purpose, unit-tested logic but isn't wired to real
+  hardware on either board.
+- [x] **Cruise / accessory switch wiring** — momentary pushbuttons for cruise,
+  AUX1 (strobe), and AUX2 (smoke), all "closed = on" with pull-downs (kill
+  and start are the pull-up exceptions). AUX1 is latched in firmware
+  (press once for on, again for off); AUX2 stays purely momentary. All
+  three confirmed working on handle-prod real hardware 2026-08-09. (AUX2
+  was briefly removed 2026-08-08 for the handle's pin budget, restored
+  2026-08-09 once pins freed up elsewhere on that board.)
 
 ## Firmware TODOs
 
