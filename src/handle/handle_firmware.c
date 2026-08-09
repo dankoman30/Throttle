@@ -18,14 +18,14 @@
 #include <stdbool.h>
 #include "throttle_protocol.h"
 #include "crc8.h"
+#ifdef USE_HAL_DRIVER
+#include "stm32l4xx_hal.h" /* HAL_GetTick() for millis() below */
+#endif
 
-/* --- Hardware handles (fill in during board bring-up) --- */
-// extern ADC_HandleTypeDef hadc1;         /* trigger position input */
-// extern nrf24_handle_t g_radio;           /* nRF24L01+ instance - see src/common/nrf24.h.
-//                                              Pin assignment not yet finalized (no real handle
-//                                              board project exists yet - DEVELOPMENT/radio/ only
-//                                              covers bring-up boards so far). */
-// GPIO defines for kill switch input, start button input
+/* Real ADC/GPIO reads and the nRF24 TX itself live in
+ * DEVELOPMENT/handle/handle-prod/Src/handle_app.c, which #includes this
+ * file with HANDLE_PROD_BOARD defined - see that file's header comment for
+ * the exact list of guarded exceptions made in this one. */
 
 /* Generic time-based debounce for momentary/rocker inputs: the raw reading must
  * stay stable for INPUT_DEBOUNCE_MS before the debounced state changes, rejecting
@@ -84,10 +84,12 @@ static bool      g_cruise_idle_rearmed = false;  /* continuous hold satisfied; n
 static debounce_t g_cruise_btn_db;
 static debounce_t g_aux1_db;
 
-/* Replace with your actual millisecond tick source (e.g. HAL_GetTick()) */
 static uint32_t millis(void) {
-    // return HAL_GetTick();
-    return 0; /* placeholder */
+#ifdef USE_HAL_DRIVER
+    return HAL_GetTick();
+#else
+    return 0; /* placeholder: no HAL in the host-side compile-check build */
+#endif
 }
 
 /* Read raw ADC and map to 0-255 throttle scale.
@@ -100,8 +102,13 @@ static uint32_t millis(void) {
  * equivalent of the fail-safe switch polarity: the failure state is the
  * safe state. */
 static uint8_t read_throttle_position(void) {
-    // uint32_t raw = HAL_ADC_GetValue(&hadc1); // e.g. 0-4095 for 12-bit ADC
+#ifdef HANDLE_PROD_BOARD
+    HAL_ADC_Start(&hadc1);
+    HAL_ADC_PollForConversion(&hadc1, 10);
+    uint32_t raw = HAL_ADC_GetValue(&hadc1); /* 0-4095, 12-bit */
+#else
     uint32_t raw = 0; /* placeholder */
+#endif
 
     static uint32_t filtered = 0;
     const uint32_t FILTER_SHIFT = 2; /* simple exponential moving average, tune as needed */
@@ -134,8 +141,11 @@ static uint8_t read_throttle_position(void) {
  * (This is the reverse polarity from start/cruise/aux, and that is on purpose:
  *  a missed kill is dangerous, a spurious kill is merely a safe engine-off.) */
 static bool read_kill_switch(void) {
-    // return HAL_GPIO_ReadPin(KILL_SW_GPIO_Port, KILL_SW_Pin) == GPIO_PIN_SET; /* open/broken = HIGH = kill */
+#ifdef HANDLE_PROD_BOARD
+    return HAL_GPIO_ReadPin(KILL_SW_GPIO_Port, KILL_SW_Pin) == GPIO_PIN_SET; /* open/broken = HIGH = kill */
+#else
     return false; /* placeholder: "not requesting kill" so the stub stays runnable */
+#endif
 }
 
 /* Debounced kill: the line must read "kill" continuously for KILL_DEBOUNCE_MS
@@ -154,8 +164,11 @@ static bool kill_confirmed(void) {
 }
 
 static bool read_start_button_raw(void) {
-    // return HAL_GPIO_ReadPin(START_BTN_GPIO_Port, START_BTN_Pin) == GPIO_PIN_SET;
+#ifdef HANDLE_PROD_BOARD
+    return HAL_GPIO_ReadPin(START_BTN_GPIO_Port, START_BTN_Pin) == GPIO_PIN_RESET; /* pull-up, active-low */
+#else
     return false; /* placeholder */
+#endif
 }
 
 /* --- Cruise + accessory inputs ---
@@ -166,13 +179,19 @@ static bool read_start_button_raw(void) {
  * accessory off). Only kill inverts (see read_kill_switch). Keeping the ONE
  * polarity decision per input right here makes re-wiring a one-line change. */
 static bool read_cruise_button_raw(void) { /* closed = pressed */
-    // return HAL_GPIO_ReadPin(CRUISE_BTN_GPIO_Port, CRUISE_BTN_Pin) == GPIO_PIN_SET;
+#ifdef HANDLE_PROD_BOARD
+    return HAL_GPIO_ReadPin(CRUISE_BTN_GPIO_Port, CRUISE_BTN_Pin) == GPIO_PIN_SET; /* pull-down */
+#else
     return false; /* placeholder */
+#endif
 }
 
 static bool read_aux1_switch(void) { /* e.g. lights: closed = on */
-    // return HAL_GPIO_ReadPin(AUX1_GPIO_Port, AUX1_Pin) == GPIO_PIN_SET;
+#ifdef HANDLE_PROD_BOARD
+    return HAL_GPIO_ReadPin(AUX1_SW_GPIO_Port, AUX1_SW_Pin) == GPIO_PIN_SET; /* pull-down */
+#else
     return false; /* placeholder */
+#endif
 }
 
 /* Cruise control, resolved entirely on the handle.
@@ -281,7 +300,14 @@ static bool start_request_confirmed(void) {
     return g_start_hold_confirmed;
 }
 
-static void build_and_send_packet(void) {
+/* Most recently built packet. A real board's driver reads this and sends it
+ * over the radio externally - same externally-observed-state pattern
+ * receiver_firmware.c uses for its outputs (g_current_servo_throttle,
+ * g_aux1_state, ...), just applied to an output that happens to be built
+ * inside this shared file instead of a bare stub. */
+static throttle_packet_t g_last_packet;
+
+static void build_packet(void) {
     uint32_t now = millis();
     throttle_packet_t pkt;
     pkt.sync = PACKET_SYNC_BYTE;
@@ -311,7 +337,7 @@ static void build_and_send_packet(void) {
 
     pkt.crc8 = crc8_compute((const uint8_t *)&pkt, PACKET_CRC_LEN);
 
-    // nrf24_send_payload(&g_radio, (const uint8_t *)&pkt, PACKET_SIZE);
+    g_last_packet = pkt;
 }
 
 int handle_firmware_main(void) {
@@ -331,6 +357,11 @@ int handle_firmware_main(void) {
      *                                       // nrf24_init() already leaves the chip ready to
      *                                       // transmit (PTX, CE low) - handle needs no further
      *                                       // mode call.
+     *
+     * This stub loop is never actually called on real hardware - see
+     * DEVELOPMENT/handle/handle-prod/Src/handle_app.c, which drives
+     * build_packet() and the radio send itself. Kept here as a host-side
+     * reference/compile-check entry point only.
      */
 
     uint32_t last_tx = millis();
@@ -339,7 +370,8 @@ int handle_firmware_main(void) {
         uint32_t now = millis();
         if ((now - last_tx) >= HANDLE_TX_PERIOD_MS) {
             last_tx = now;
-            build_and_send_packet();
+            build_packet();
+            // nrf24_send_payload(&g_radio, (const uint8_t *)&g_last_packet, PACKET_SIZE);
         }
         /* keep loop tight - avoid blocking delays here, timing precision matters */
     }
