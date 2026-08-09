@@ -52,6 +52,13 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
 
 ## Hardware decisions
 
+- [ ] **Handle kill switch is a bench-test stand-in, not the real part.**
+  `handle-prod` is currently bench-testing with a normally-open switch
+  bridged closed by a jumper wire, purely to unblock testing everything
+  else. This project's fail-safe kill design (ADR 0003) requires a
+  genuinely **normally-closed** switch/contact block - must be swapped
+  before the handle is wired for real. See
+  `DEVELOPMENT/handle/handle-prod/docs/wiring.md` "Kill switch".
 - [ ] **Servo selection** — measure pull force/travel across the full stroke
   **through the full installed cable run** (remote mount adds Bowden friction;
   the bare throttle cable understates it) before ordering (~15–25 kg·cm digital
