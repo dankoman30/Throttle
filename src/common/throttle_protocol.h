@@ -22,9 +22,9 @@
 #define CMD_FLAG_KILL         (1u << 0)   /* cut ignition, latch KILLED */
 #define CMD_FLAG_START_REQ    (1u << 1)   /* hold-confirmed start request */
 #define CMD_FLAG_CRUISE       (1u << 2)   /* throttle is being held at a cruise setpoint */
-#define CMD_FLAG_AUX1         (1u << 3)   /* accessory 1 (e.g. lights) - level, on while set */
-/* bit 4 was AUX2 (smoke) - removed 2026-08-08, not part of the handle's
- * physical switch layout. Bits 4-7 reserved for future use. */
+#define CMD_FLAG_AUX1         (1u << 3)   /* accessory 1 (e.g. strobe lights) - LATCHED on the handle (toggle button), level here */
+#define CMD_FLAG_AUX2         (1u << 4)   /* accessory 2 (e.g. smoke) - purely momentary level, on while held */
+/* bits 5-7 reserved for future use. */
 
 /* Cruise control (resolved on the HANDLE; see handle_firmware.c).
  * Cruise freezes the transmitted throttle at the value captured when engaged.

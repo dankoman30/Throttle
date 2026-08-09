@@ -57,8 +57,8 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define MCO_Pin GPIO_PIN_0
-#define MCO_GPIO_Port GPIOA
+#define AUX1_LED_Pin GPIO_PIN_0
+#define AUX1_LED_GPIO_Port GPIOA
 #define NRF_CE_Pin GPIO_PIN_1
 #define NRF_CE_GPIO_Port GPIOA
 #define VCP_TX_Pin GPIO_PIN_2
@@ -69,6 +69,8 @@ void Error_Handler(void);
 #define KILL_SW_GPIO_Port GPIOA
 #define TRIGGER_ADC_Pin GPIO_PIN_5
 #define TRIGGER_ADC_GPIO_Port GPIOA
+#define AUX2_SW_Pin GPIO_PIN_6
+#define AUX2_SW_GPIO_Port GPIOA
 #define CRUISE_BTN_Pin GPIO_PIN_7
 #define CRUISE_BTN_GPIO_Port GPIOA
 #define START_BTN_Pin GPIO_PIN_0
@@ -81,6 +83,8 @@ void Error_Handler(void);
 #define LED_GREEN_GPIO_Port GPIOA
 #define LED_BLUE_Pin GPIO_PIN_10
 #define LED_BLUE_GPIO_Port GPIOA
+#define AUX2_LED_Pin GPIO_PIN_11
+#define AUX2_LED_GPIO_Port GPIOA
 #define SWDIO_Pin GPIO_PIN_13
 #define SWDIO_GPIO_Port GPIOA
 #define SWCLK_Pin GPIO_PIN_14

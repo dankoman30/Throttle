@@ -80,9 +80,21 @@ static bool      g_cruise_idle_last = false;    /* was throttle at/below the rea
 static uint32_t  g_cruise_idle_since_ms = 0;     /* when throttle most recently arrived at/below it */
 static bool      g_cruise_idle_rearmed = false;  /* continuous hold satisfied; next real move cancels cruise */
 
-/* Debounce state for the cruise button and the accessory input. */
+/* Debounce state for the cruise button and the two accessory inputs. */
 static debounce_t g_cruise_btn_db;
 static debounce_t g_aux1_db;
+static debounce_t g_aux2_db;
+
+/* AUX1 (e.g. strobe lights) is LATCHED here, same toggle-on-rising-edge
+ * shape as cruise below: press once to turn on, press again to turn off.
+ * g_aux1_engaged is exposed for a real board's indicator LED, same
+ * externally-observed-state pattern as everything else in this file. */
+static bool      g_aux1_engaged = false;
+static bool      g_aux1_button_last = false;
+
+/* AUX2 (e.g. smoke) is purely momentary - a live debounced level, on only
+ * while the switch is held/closed. g_aux2_state is exposed the same way. */
+static bool      g_aux2_state = false;
 
 static uint32_t millis(void) {
 #ifdef USE_HAL_DRIVER
@@ -186,9 +198,17 @@ static bool read_cruise_button_raw(void) { /* closed = pressed */
 #endif
 }
 
-static bool read_aux1_switch(void) { /* e.g. lights: closed = on */
+static bool read_aux1_switch(void) { /* momentary button; closed = pressed. Latched into a toggle in build_packet(). */
 #ifdef HANDLE_PROD_BOARD
     return HAL_GPIO_ReadPin(AUX1_SW_GPIO_Port, AUX1_SW_Pin) == GPIO_PIN_SET; /* pull-down */
+#else
+    return false; /* placeholder */
+#endif
+}
+
+static bool read_aux2_switch(void) { /* e.g. smoke: closed = on, purely momentary (no latch) */
+#ifdef HANDLE_PROD_BOARD
+    return HAL_GPIO_ReadPin(AUX2_SW_GPIO_Port, AUX2_SW_Pin) == GPIO_PIN_SET; /* pull-down */
 #else
     return false; /* placeholder */
 #endif
@@ -331,9 +351,19 @@ static void build_packet(void) {
         pkt.flags |= CMD_FLAG_START_REQ;
     }
 
-    /* Accessory is an independent, debounced level flag (lights) - it rides
-     * alongside whatever the primary command is, including kill. */
-    if (debounce_update(&g_aux1_db, read_aux1_switch(), now)) pkt.flags |= CMD_FLAG_AUX1;
+    /* Accessories are independent of the primary command, including kill -
+     * same as before, just one is now latched and one is momentary.
+     * AUX1: toggle on a rising edge of the debounced button. */
+    bool aux1_btn = debounce_update(&g_aux1_db, read_aux1_switch(), now);
+    if (aux1_btn && !g_aux1_button_last) {
+        g_aux1_engaged = !g_aux1_engaged;
+    }
+    g_aux1_button_last = aux1_btn;
+    if (g_aux1_engaged) pkt.flags |= CMD_FLAG_AUX1;
+
+    /* AUX2: live debounced level, no latch. */
+    g_aux2_state = debounce_update(&g_aux2_db, read_aux2_switch(), now);
+    if (g_aux2_state) pkt.flags |= CMD_FLAG_AUX2;
 
     pkt.crc8 = crc8_compute((const uint8_t *)&pkt, PACKET_CRC_LEN);
 

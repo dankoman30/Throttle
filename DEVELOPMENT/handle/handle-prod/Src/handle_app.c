@@ -15,10 +15,11 @@
  *   - millis() calls HAL_GetTick() when USE_HAL_DRIVER is defined (same
  *     hardware-wrapper convention as receiver_firmware.c).
  *   - read_throttle_position()'s raw ADC read, read_kill_switch(),
- *     read_start_button_raw(), read_cruise_button_raw(), and
- *     read_aux1_switch() read the real GPIO/ADC when HANDLE_PROD_BOARD is
- *     defined (only true here). These are genuine inputs the kill/cruise/
- *     start logic directly calls and depends on.
+ *     read_start_button_raw(), read_cruise_button_raw(),
+ *     read_aux1_switch(), and read_aux2_switch() read the real GPIO/ADC
+ *     when HANDLE_PROD_BOARD is defined (only true here). These are
+ *     genuine inputs the kill/cruise/start logic directly calls and
+ *     depends on.
  *   - build_packet() (renamed from build_and_send_packet(): it no longer
  *     sends anything) stores its result into g_last_packet instead of
  *     calling the radio driver inline, so this file can send it
@@ -75,6 +76,14 @@ static void handle_app_led_tick(uint32_t now) {
     HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, blue ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 
+/* AUX1/AUX2 indicator LEDs: mirror what THIS board is commanding, not
+ * confirmation the receiver acted on it (no telemetry downlink exists).
+ * AUX1 mirrors the latched toggle state, AUX2 the live momentary level. */
+static void handle_app_aux_led_tick(void) {
+    HAL_GPIO_WritePin(AUX1_LED_GPIO_Port, AUX1_LED_Pin, g_aux1_engaged ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(AUX2_LED_GPIO_Port, AUX2_LED_Pin, g_aux2_state ? GPIO_PIN_SET : GPIO_PIN_RESET);
+}
+
 void handle_app_init(void) {
     g_radio.hspi     = &hspi1;
     g_radio.ce_port  = NRF_CE_GPIO_Port;
@@ -86,6 +95,8 @@ void handle_app_init(void) {
     HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(AUX1_LED_GPIO_Port, AUX1_LED_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(AUX2_LED_GPIO_Port, AUX2_LED_Pin, GPIO_PIN_RESET);
 }
 
 void handle_app_tick(void) {
@@ -99,4 +110,5 @@ void handle_app_tick(void) {
     }
 
     handle_app_led_tick(now);
+    handle_app_aux_led_tick();
 }

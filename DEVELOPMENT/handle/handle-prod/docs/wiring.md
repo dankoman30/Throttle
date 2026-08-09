@@ -12,29 +12,32 @@ given as **Arduino label (STM32 name)**.
 
 | Function | Arduino label | STM32 pin | Direction | Resistor | Notes |
 |---|---|---|---|---|---|
+| AUX1 indicator LED | A0 | PA0 (`AUX1_LED`) | out | 220–330Ω | mirrors this board's own AUX1 latch state |
 | Radio CE | A1 | PA1 (`NRF_CE`) | out | - | |
 | Radio CSN | A2 | PA3 (`NRF_CSN`) | out | - | |
 | Kill switch | A3 | PA4 (`KILL_SW`) | in, pull-up | - (internal) | active-high (open/broken = kill) - currently a NO jumper stand-in, see "Kill switch" below |
 | Trigger position | A4 | PA5 (`TRIGGER_ADC`, `ADC1_IN10`) | analog in | 100kΩ pull-down (wiper node → GND) | see "Trigger" below |
+| AUX2 switch (smoke) | A5 | PA6 (`AUX2_SW`) | in, pull-down | - (internal) | momentary, active-high (closed = on) - other leg to **3V3**, not GND |
 | Cruise button | A6 | PA7 (`CRUISE_BTN`) | in, pull-down | - (internal) | active-high (closed = pressed) - other leg to **3V3**, not GND |
 | Start button | D3 | PB0 (`START_BTN`) | in, pull-up | - (internal) | active-low (pressed = LOW) |
-| AUX1 switch (lights) | D6 | PB1 (`AUX1_SW`) | in, pull-down | - (internal) | active-high (closed = on) - other leg to **3V3**, not GND |
+| AUX1 switch (strobe) | D6 | PB1 (`AUX1_SW`) | in, pull-down | - (internal) | momentary button, but **latched in firmware** (toggle on/off) - other leg to **3V3**, not GND |
 | Status LED red | D9 | PA8 (`LED_RED`) | out | 220Ω | |
 | Status LED green | D1/TX | PA9 (`LED_GREEN`) | out | 220Ω | |
 | Status LED blue | D0/RX | PA10 (`LED_BLUE`) | out | 220Ω | |
+| AUX2 indicator LED | D10 | PA11 (`AUX2_LED`) | out | 220–330Ω | mirrors this board's own live AUX2 level |
 | Radio SCK | D13 | PB3 (`SPI1_SCK`) | out | - | onboard LD3 flickers with SPI clock - harmless |
 | Radio MISO | D12 | PB4 (`SPI1_MISO`) | in | - | |
 | Radio MOSI | D11 | PB5 (`SPI1_MOSI`) | out | - | |
 
-Cruise and AUX1 use the opposite pull convention from kill/start (pull-down
-vs pull-up), so their "other leg" goes to 3V3 instead of GND - easy to mix
-up wiring four buttons in a row (confirmed the hard way on the bench:
-wiring both to GND like kill/start meant the pin could never read HIGH, so
-neither button did anything until corrected).
+Cruise, AUX1, and AUX2 use the opposite pull convention from kill/start
+(pull-down vs pull-up), so their "other leg" goes to 3V3 instead of GND -
+easy to mix up wiring several buttons in a row (confirmed the hard way on
+the bench: wiring cruise/AUX1 to GND like kill/start meant those pins
+could never read HIGH, so neither button did anything until corrected).
 
-13 of 17 usable pins committed, 4 spare (`PA0`, `PA2`/`VCP_TX`, `PA6`, `PA11`
-- `PA2`/`PA15` are wired to the ST-Link VCP by default; leave them alone
-unless USB serial debug is ever needed).
+16 of 17 usable pins committed, 1 spare (`PA2`/`VCP_TX` - wired to the
+ST-Link VCP by default; leave it alone unless USB serial debug is ever
+needed).
 
 ## Radio (nRF24L01+PA+LNA)
 
@@ -99,10 +102,34 @@ firmware, not here.
 Momentary, pull-down, active-high (closed = pressed). One leg to
 **A6 (PA7)**, other leg to **3V3**.
 
-## AUX1 switch (lights)
+## AUX1 switch (strobe) — latching
 
-Rocker or momentary, pull-down, active-high (closed = on) - same convention
-as cruise. One leg to **D6 (PB1)**, other leg to **3V3**.
+Physically a plain momentary pushbutton, pull-down, active-high (closed =
+on) - same convention and same physical switch type as cruise. One leg to
+**D6 (PB1)**, other leg to **3V3**. The latching behavior (press once to
+turn on, press again to turn off) is entirely in firmware
+(`handle_firmware.c`'s `build_packet()`, toggling on a rising edge - same
+shape as `apply_cruise()`'s toggle) - the switch itself is not a
+maintained-position part.
+
+## AUX2 switch (smoke) — momentary
+
+Physically identical wiring style to AUX1/cruise (momentary pushbutton,
+pull-down, active-high, other leg to 3V3), but **no latching in
+firmware** - it's a pure live level, on only while held. One leg to
+**A5 (PA6)**, other leg to **3V3**.
+
+## AUX1 / AUX2 indicator LEDs
+
+Local-only indicators - each shows what THIS board is currently
+commanding, not confirmation the receiver received/applied it (no
+telemetry downlink exists). Standard single LEDs, same style as
+receiver-prod's original AUX test LEDs:
+
+- AUX1: **A0 (PA0)** → 220–330Ω resistor → LED anode → LED cathode → GND.
+  Lit while AUX1 is latched on.
+- AUX2: **D10 (PA11)** → 220–330Ω resistor → LED anode → LED cathode →
+  GND. Lit while the AUX2 button is actively held.
 
 ## Status LED
 

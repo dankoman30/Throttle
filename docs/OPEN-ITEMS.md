@@ -23,10 +23,12 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   (175), `WATCHDOG_FULL_IDLE_MS` (600), `RAMP_TO_IDLE_DURATION_MS` (400),
   `LINK_RESTORE_STABLE_MS` (300). Current values are starting points.
 - [x] ~~Aux-output policy during KILL / loss of signal (smoke force-gating)~~ —
-  **moot**: AUX2 (smoke) removed 2026-08-08 to fit the handle's pin budget.
-  Only AUX1 (lights) remains, which needs no special kill/loss-of-signal
-  policy - `apply_aux_outputs` already mirrors its flag after the safety
-  state machine runs, independent of kill/throttle.
+  **resolved: no special policy, by deliberate choice.** AUX2 (smoke) was
+  removed 2026-08-08 then restored 2026-08-09 once pins freed up elsewhere
+  on the handle; revisiting this question on restore, the decision was to
+  keep both AUX1 and AUX2 fully out of the kill/start/throttle state
+  machine - `apply_aux_outputs` mirrors both flags unconditionally, same as
+  before. Not an oversight - discussed and confirmed 2026-08-09.
 - [ ] **Confirm mechanical kill wiring** is independent of the MCU and grounds
   the ignition line with zero power to electronics (backup for a dead radio).
 - [x] ~~`RUNNING` → `IDLE_SAFE` restart policy~~ / ~~RPM START guard not fail-safe~~ —
@@ -129,10 +131,13 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   bar/buzzer math in `battery_monitor.h` (`battery_eval`/`battery_buzzer_on`)
   stays as general-purpose, unit-tested logic but isn't wired to real
   hardware on either board.
-- [ ] **Cruise / accessory switch wiring** — momentary (cruise) + rocker/momentary
-  (lights), all "closed = on" with pull-downs (kill is the exception). (AUX2/
-  smoke removed 2026-08-08 to fit the handle's pin budget - only one
-  accessory switch now.)
+- [x] **Cruise / accessory switch wiring** — momentary pushbuttons for cruise,
+  AUX1 (strobe), and AUX2 (smoke), all "closed = on" with pull-downs (kill
+  and start are the pull-up exceptions). AUX1 is latched in firmware
+  (press once for on, again for off); AUX2 stays purely momentary. All
+  three confirmed working on handle-prod real hardware 2026-08-09. (AUX2
+  was briefly removed 2026-08-08 for the handle's pin budget, restored
+  2026-08-09 once pins freed up elsewhere on that board.)
 
 ## Firmware TODOs
 

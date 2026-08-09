@@ -22,12 +22,13 @@
  *     directly calls and depends on, unlike the purely-output stubs below
  *     which this file drives externally instead by observing already-
  *     decided state (g_state, g_current_servo_throttle, g_batt_low, ...).
- *   - apply_aux_outputs() stores into g_aux1_state so this file can read
- *     the latest commanded accessory state independent of packet arrival,
- *     same externally-observed pattern as everything else. (AUX2 existed
- *     briefly and was removed 2026-08-08 to save a pin on the handle -
- *     AUX2_OUT/PA10 stays reserved in CubeMX but is unused; the placeholder
- *     LED there can be disconnected.)
+ *   - apply_aux_outputs() stores into g_aux1_state/g_aux2_state so this
+ *     file can read the latest commanded accessory state independent of
+ *     packet arrival, same externally-observed pattern as everything else.
+ *     (AUX2 was removed 2026-08-08 to save a pin on the handle, then
+ *     restored 2026-08-09 once pins freed up elsewhere - AUX2_OUT/PA10 was
+ *     never actually un-assigned in CubeMX, so no pin changes were needed
+ *     here, just the code path.)
  *
  * Everything else in receiver_firmware.c - on_packet_received(),
  * handle_valid_packet(), watchdog_tick(), start_tick(), crank_tick(),
@@ -99,9 +100,10 @@ static void prod_actuation_tick(uint32_t now) {
     HAL_GPIO_WritePin(STARTER_RELAY_GPIO_Port, STARTER_RELAY_Pin,
                        (g_state == STATE_STARTING) ? GPIO_PIN_SET : GPIO_PIN_RESET);
 
-    /* Accessory output: mirror the latest commanded state, stored by
-     * apply_aux_outputs() into g_aux1_state. */
+    /* Accessory outputs: mirror the latest commanded state, stored by
+     * apply_aux_outputs() into g_aux1_state/g_aux2_state. */
     HAL_GPIO_WritePin(AUX1_OUT_GPIO_Port, AUX1_OUT_Pin, g_aux1_state ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(AUX2_OUT_GPIO_Port, AUX2_OUT_Pin, g_aux2_state ? GPIO_PIN_SET : GPIO_PIN_RESET);
 
     /* Green: engine-running proxy - same rule as the bench rig's LED_GREEN
      * (see its bench_actuation_tick() for the original). Lit only on a
@@ -163,6 +165,7 @@ void prod_app_init(void) {
     HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(AUX1_OUT_GPIO_Port, AUX1_OUT_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(AUX2_OUT_GPIO_Port, AUX2_OUT_Pin, GPIO_PIN_RESET);
 }
 
 void prod_app_tick(void) {
