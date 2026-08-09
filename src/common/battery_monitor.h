@@ -7,16 +7,18 @@
 #include <stdbool.h>
 
 /* ---------------------------------------------------------------------
- * Local battery monitor - runs INDEPENDENTLY on both the transmitter and
- * the receiver. There is deliberately NO return telemetry: each unit only
- * ever looks at its own pack. That keeps the link one-way (handle -> remote)
- * and avoids the complexity of the handle having to receive and display the
- * receiver's battery level.
+ * Local battery monitor - used by the receiver only (see
+ * src/receiver/receiver_firmware.c). The handle has no onboard battery
+ * sense (2026-08-08: dropped in favor of standalone battery meters on the
+ * packs themselves, not wired to the board) and no return telemetry, so
+ * there is deliberately no cross-unit battery visibility either direction.
  *
  * Only the pure math lives here (millivolts -> LED bar count + low flag) so
  * it can be hand-verified/unit-tested off-target. The ADC read, the bar
- * LEDs, and the piezo buzzer are wired PER BOARD in each firmware, because
- * the two units use different packs, dividers, and pins.
+ * LEDs, and the piezo buzzer are wired PER BOARD in firmware - receiver-prod
+ * currently folds the low flag into its tri-color status LED's blink rate
+ * instead of using a bar/buzzer (see prod_app.c), leaving set_battery_leds()/
+ * set_buzzer() as no-op stubs there.
  * ------------------------------------------------------------------- */
 
 /* Buzzer cadence for the low-battery alert (both sides). Non-blocking:

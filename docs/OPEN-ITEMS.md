@@ -84,9 +84,10 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   between (a) servo on the receiver pack via a dedicated BEC/regulator rail with
   bulk capacitance while MCU+radio sit on a cleaner rail, or (b) a separate servo
   battery. Sized after servo selection.
-- [ ] **Battery chemistry/voltage per pack** — pick handle + receiver packs, then
-  replace placeholder mV values in `HANDLE_BATT` / `RX_BATT` and the
-  `read_battery_mv()` divider scaling with measured values.
+- [ ] **Receiver battery chemistry/voltage** — pick the receiver pack, then
+  replace the placeholder mV values in `RX_BATT` and `read_battery_mv()`'s
+  divider scaling with measured values. (Handle-side battery monitoring was
+  dropped entirely 2026-08-08 - see below - so this is receiver-only now.)
 - [ ] **Engine interface — isolation strategy (decision).** Recommend driving
   kill + starter through **relays or opto-isolated SSRs**, not bare MOSFETs, so
   receiver-ground stays isolated from the noisy engine-ground / starter domain.
@@ -102,7 +103,14 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   feature is added later.
 - [ ] **Connectors** — locking, vibration-rated (JST-SM minimum;
   Deutsch/Amphenol preferred).
-- [ ] **Battery readout wiring** — 3/4-LED bar + piezo buzzer per side.
+- [x] ~~Battery readout wiring — 3/4-LED bar + piezo buzzer per side~~ —
+  **superseded 2026-08-08**: the handle has no onboard battery sense at all
+  now (standalone battery meters on the packs themselves, not wired to the
+  board); the receiver folds low-battery into its tri-color status LED's
+  blink rate instead of a dedicated bar/buzzer (see `prod_app.c`). The
+  bar/buzzer math in `battery_monitor.h` (`battery_eval`/`battery_buzzer_on`)
+  stays as general-purpose, unit-tested logic but isn't wired to real
+  hardware on either board.
 - [ ] **Cruise / accessory switch wiring** — momentary (cruise) + rocker/momentary
   (lights), all "closed = on" with pull-downs (kill is the exception). (AUX2/
   smoke removed 2026-08-08 to fit the handle's pin budget - only one

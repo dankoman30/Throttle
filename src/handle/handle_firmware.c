@@ -18,7 +18,6 @@
 #include <stdbool.h>
 #include "throttle_protocol.h"
 #include "crc8.h"
-#include "battery_monitor.h"
 
 /* --- Hardware handles (fill in during board bring-up) --- */
 // extern ADC_HandleTypeDef hadc1;         /* trigger position input */
@@ -84,16 +83,6 @@ static bool      g_cruise_idle_rearmed = false;  /* continuous hold satisfied; n
 /* Debounce state for the cruise button and the accessory input. */
 static debounce_t g_cruise_btn_db;
 static debounce_t g_aux1_db;
-
-/* Local battery monitor state (this pack only - no telemetry from receiver). */
-static uint32_t  g_batt_last_poll_ms = 0;
-static bool      g_batt_low = false;
-
-/* Handle pack profile. Example: 2S Li-ion (~8.4V full / 6.0V empty), scaled
- * back up from whatever divider feeds the ADC. Measure and set for real. */
-static const battery_profile_t HANDLE_BATT = {
-    .full_mv = 8400, .empty_mv = 6000, .low_mv = 6600, .led_count = 4
-};
 
 /* Replace with your actual millisecond tick source (e.g. HAL_GetTick()) */
 static uint32_t millis(void) {
@@ -325,38 +314,6 @@ static void build_and_send_packet(void) {
     // nrf24_send_payload(&g_radio, (const uint8_t *)&pkt, PACKET_SIZE);
 }
 
-/* --- Local battery monitor (transmitter side) ---
- * Reads THIS unit's pack only. Drives a 3/4-LED bar that lights the moment
- * the handle powers on, and beeps a piezo when the pack is low. No return
- * telemetry: the handle never sees the receiver's battery. */
-static uint16_t read_battery_mv(void) {
-    // uint32_t raw = HAL_ADC_GetValue(&hadc_batt);   // dedicated battery ADC channel
-    // return (uint16_t)(raw * ADC_MV_PER_LSB * DIVIDER_RATIO);
-    return HANDLE_BATT.full_mv; /* placeholder: pretend full */
-}
-
-static void set_battery_leds(uint8_t lit) {
-    (void)lit; /* drive the bar-graph LED GPIOs: light 'lit' of HANDLE_BATT.led_count */
-}
-
-static void set_buzzer(bool on) {
-    (void)on;  /* drive the piezo GPIO (or start/stop a PWM tone) */
-}
-
-static void battery_tick(void) {
-    uint32_t now = millis();
-    static bool first = true;   /* poll once immediately so the LED bar lights at power-on */
-    if (first || (now - g_batt_last_poll_ms) >= BATTERY_POLL_MS) {
-        first = false;
-        g_batt_last_poll_ms = now;
-        battery_status_t st = battery_eval(read_battery_mv(), &HANDLE_BATT);
-        set_battery_leds(st.leds_lit);
-        g_batt_low = st.low;
-    }
-    /* buzzer cadence is time-based, refresh it every loop (non-blocking) */
-    set_buzzer(battery_buzzer_on(g_batt_low, now));
-}
-
 int handle_firmware_main(void) {
     /* --- Init section (fill in) ---
      * HAL_Init();
@@ -384,7 +341,6 @@ int handle_firmware_main(void) {
             last_tx = now;
             build_and_send_packet();
         }
-        battery_tick(); /* self-paced via BATTERY_POLL_MS; non-blocking */
         /* keep loop tight - avoid blocking delays here, timing precision matters */
     }
 }
