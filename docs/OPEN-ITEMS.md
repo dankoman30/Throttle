@@ -64,13 +64,24 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   the bare throttle cable understates it) before ordering (~15–25 kg·cm digital
   metal-gear, continuous-duty ballpark). See ADR 0008. Fish scale ordered
   2026-08-08 for the force measurement, arriving within a day or two.
+  **Prioritize speed/slew rate (deg/sec), second only to safety** - the
+  current SG90 placeholder's own mechanical response is a likely major
+  contributor to the throttle latency observed on the handle-prod bench
+  test (2026-08-09; AUX1, which has no filtering/rate-limit pipeline,
+  responded far faster than the servo-driven throttle). Pick a servo with
+  a genuinely fast rated speed, not just adequate torque - a strong but
+  slow servo would undermine responsiveness even with adequate pull force.
 - [ ] **Remote servo mount + cable run (ADR 0008)** — the servo is frame-mounted,
   not on the engine, and drives the throttle via a push-pull/Bowden cable. To
   design: servo bracket, cable spec + routing (avoid tight bends), and slack/
   end-stops so full servo travel = full throttle stroke. `hardware/mechanical/`.
 - [ ] **Confirm throttle return-to-idle spring** — the carb spring must reliably
   pull to idle when the servo is depowered/failed or the cable detaches (the
-  mechanical fail-safe); verify the linkage can never jam open.
+  mechanical fail-safe); verify the linkage can never jam open. May need a
+  stiffer/different return spring depending on the selected servo's own
+  unpowered ("limp") holding force - a spring sized for one servo's drag
+  might not reliably overcome a different one's. Measure/select together
+  with the servo, not independently.
 - [ ] **Cable tolerance to engine movement** — the engine shifts on its rubber
   mounts relative to the frame; the cable run must flex without binding or
   shifting the throttle setpoint.
