@@ -115,6 +115,10 @@ get bumped).
 
 ## AUX1 / AUX2 (accessory outputs)
 
+**Confirmed working on real hardware 2026-08-09** — both outputs
+correctly track the handle's commanded state (AUX1 latched, AUX2
+momentary) over the radio link.
+
 Eventually these will drive relays (AUX1 a strobe light circuit, AUX2 a
 smoke circuit). **For now, each is wired as an individual indicator LED**
 just to confirm the circuit is functioning — standard LED wiring (a plain

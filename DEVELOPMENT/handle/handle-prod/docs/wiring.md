@@ -104,6 +104,9 @@ Momentary, pull-down, active-high (closed = pressed). One leg to
 
 ## AUX1 switch (strobe) — latching
 
+**Confirmed working on real hardware 2026-08-09** — press-to-latch-on,
+press-again-to-off, receiver-side AUX1 output tracking correctly.
+
 Physically a plain momentary pushbutton, pull-down, active-high (closed =
 on) - same convention and same physical switch type as cruise. One leg to
 **D6 (PB1)**, other leg to **3V3**. The latching behavior (press once to
@@ -114,12 +117,17 @@ maintained-position part.
 
 ## AUX2 switch (smoke) — momentary
 
+**Confirmed working on real hardware 2026-08-09** — on only while held,
+receiver-side AUX2 output tracking correctly.
+
 Physically identical wiring style to AUX1/cruise (momentary pushbutton,
 pull-down, active-high, other leg to 3V3), but **no latching in
 firmware** - it's a pure live level, on only while held. One leg to
 **A5 (PA6)**, other leg to **3V3**.
 
 ## AUX1 / AUX2 indicator LEDs
+
+**Confirmed working on real hardware 2026-08-09.**
 
 Local-only indicators - each shows what THIS board is currently
 commanding, not confirmation the receiver received/applied it (no

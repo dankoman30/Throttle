@@ -4,8 +4,8 @@ Runs the **real** handle kill-latch/cruise/start-hold logic
 (`src/handle/handle_firmware.c`, unmodified except small, reviewed hardware
 fill-ins guarded by `HANDLE_PROD_BOARD` — see `Src/handle_app.c`'s header
 comment) on an STM32L432KC (Nucleo-32), driving **real hardware**: the
-trigger position sensor, kill/start/cruise/AUX1 inputs, the nRF24L01+
-radio TX, and a tri-color status LED. Compare
+trigger position sensor, kill/start/cruise/AUX1/AUX2 inputs, the nRF24L01+
+radio TX, a tri-color status LED, and two AUX indicator LEDs. Compare
 `DEVELOPMENT/receiver/receiver-prod/`, the same `#include`-reuse pattern
 applied to the receiver side.
 
@@ -31,12 +31,23 @@ needs a manually-added `<link>` entry or the IDE won't see it.
 Reuses "board A" from `DEVELOPMENT/radio/spi-bringup/` — its radio wiring
 (`NRF_CE`=`PA1`, `NRF_CSN`=`PA3`, SPI1 on `PB3`/`PB4`/`PB5`) already
 matched this project's pin plan exactly, so it carried over unchanged;
-everything else (trigger, kill/start/cruise/AUX1, status LED) was wired
-fresh on top. Same SB16/SB18-avoidance reasoning as receiver-prod - see
-`docs/wiring.md` for the full pin table and why it works.
+everything else (trigger, kill/start/cruise/AUX1/AUX2, status + indicator
+LEDs) was wired fresh on top. Same SB16/SB18-avoidance reasoning as
+receiver-prod - see `docs/wiring.md` for the full pin table and why it
+works.
 
 ## Status
 
+- **2026-08-09: AUX2 restored, AUX1/AUX2 given distinct behavior,
+  confirmed on real hardware.** AUX2 (smoke) was reinstated once adding
+  its switch plus two indicator LEDs still fit the pin budget (16 of 17).
+  AUX1 (strobe) is now LATCHED in firmware - toggle on/off on successive
+  presses, same shape as `apply_cruise()`'s toggle - while AUX2 stays
+  purely momentary, matching how AUX1 used to work. Deliberately kept
+  both fully out of the receiver's kill/start/throttle state machine
+  (discussed and reconfirmed, not just left over from before AUX2 was
+  removed) - see `docs/OPEN-ITEMS.md`. Both indicator LEDs and both
+  receiver-side outputs confirmed tracking correctly over the radio link.
 - **2026-08-08: full command path confirmed on real hardware** — radio
   uplink to a receiver board, trigger position driving the servo live over
   the air, the start button correctly showing the cranking indication,
