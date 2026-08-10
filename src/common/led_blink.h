@@ -15,8 +15,8 @@
  *               kill). Lub-dub: two quick pulses, then a longer pause.
  *   KILL      - overrides the heartbeat once latched. Long-long: two
  *               slower, more deliberate pulses.
- * Both ~1000ms per cycle at 100% scale - tune like any other timing
- * constant in this project, on the bench.
+ * Heartbeat ~1800ms/cycle, kill ~1000ms/cycle, both at 100% scale - tune
+ * like any other timing constant in this project, on the bench.
  * ------------------------------------------------------------------- */
 
 typedef struct {
@@ -25,10 +25,10 @@ typedef struct {
 } blink_step_t;
 
 static const blink_step_t HEARTBEAT_PATTERN[] = {
-    { true,  100 },
-    { false, 150 },
-    { true,  100 },
-    { false, 650 },
+    { true,  150 },
+    { false, 200 },
+    { true,  150 },
+    { false, 1300 },
 };
 #define HEARTBEAT_PATTERN_LEN (sizeof(HEARTBEAT_PATTERN) / sizeof(HEARTBEAT_PATTERN[0]))
 
