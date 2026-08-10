@@ -51,6 +51,38 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   coupled noise can pull it toward "kill". `KILL_DEBOUNCE_MS` rejects short
   spikes but not sustained EMI. Add ferrite chokes + twisted/shielded kill
   wiring and route away from the CDI/coil.
+- [ ] **Multi-unit isolation — prevent a foreign handle from controlling this
+  receiver.** Today every handle/receiver pair built from this code uses the
+  *identical* hardcoded nRF24 address (`PLACEHOLDER_ADDR` = `0xE7E7E7E7E7`)
+  and channel (`PLACEHOLDER_RF_CHANNEL` = 76, see `src/common/nrf24.c`).
+  Nothing in the packet (`sync`/`seq`/`throttle`/`flags`/`crc8`) carries any
+  device identity, so two pilots' rigs within radio range are indistinguishable
+  to each other's receivers — a receiver would accept a well-formed
+  KILL/START/THROTTLE packet from *any* handle, not just its own. **Leaning
+  fix:** assign each manufactured handle+receiver pair a unique 5-byte nRF24
+  address, burned into both firmwares as a compile-time constant (like a
+  serial number), replacing the placeholder — hardware-level address matching
+  means a foreign packet is never even received by the MCU, no packet format
+  change needed, no runtime pairing handshake (consistent with ADR 0001's
+  no-ack rationale and this project's compile-time-constants-only
+  philosophy). Considered and set aside as the primary fix: per-pair channel
+  (channel is a scarcer resource already earmarked for interference avoidance
+  below — don't conflate the two; could still be a bonus secondary layer) and
+  a device-ID in the 3 reserved `flags` bits (software-only check that runs
+  after the packet is already received, and only 8 distinct values — not
+  enough for a real fleet; leave those bits reserved). **Allocation scheme
+  decided (recording only — not yet wired into firmware):** address =
+  `0xE7 0xE7 0xE7 0xE7 <N>`, where `<N>` is a one-byte sequential unit number.
+  `0x00` stays reserved as an "unassigned/placeholder" marker (so a unit still
+  on `PLACEHOLDER_ADDR` is obviously unfinished) and `0xFF` is reserved for a
+  possible future broadcast/test address; assignable range is `0x01`–`0xFE`
+  (254 pairs). Numbers are assigned sequentially — never reused, even for a
+  retired unit — and logged the moment they're assigned in the new append-only
+  `docs/UNIT-REGISTRY.md`. Still open: how a unit's assigned address actually
+  gets into its firmware image at build time (per-unit config header vs. build
+  flag) — implementation work for when this is picked back up in code, not a
+  documentation question. Worth its own ADR once that build-time mechanism is
+  also decided.
 
 ## Hardware decisions
 
@@ -98,6 +130,8 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
 - [ ] **Channel selection** — pick a channel clear of both local WiFi and the
   engine's worst harmonic bands; consider scanning on boot. Buy the module from a
   reputable supplier (not clones — mismatched PA/LNA erases the margin).
+  (Scoped to interference avoidance only — see "Multi-unit isolation" above
+  for preventing cross-talk between two pilots' rigs.)
 - [x] **Receiver power source** — dedicated receiver battery (isolated from the
   engine's starter battery to avoid crank brown-out / EMI). See ADR 0005.
 - [ ] **Servo power architecture (decision)** — servo transients are large; decide
