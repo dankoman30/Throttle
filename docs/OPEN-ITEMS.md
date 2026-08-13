@@ -86,6 +86,30 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
 
 ## Hardware decisions
 
+- [ ] **Production PCB approach — Nucleo carrier board vs. bare STM32L432KC.**
+  Need to decide, before ordering from PCBWay (or similar), whether production
+  `handle-prod`/`receiver-prod` units keep the Nucleo-32 L432KC dev board
+  soldered onto a custom carrier PCB that just breaks out its pins, or move to
+  a from-scratch board built around the bare STM32L432KC chip. The bare-chip
+  route drops dev-board cost/size but takes on power supervisor, crystal,
+  ST-Link/debug header, and boot-mode strapping that the Nucleo currently
+  provides for free (ADR 0006 chose the Nucleo for bring-up; this is the
+  separate question of what production actually ships on).
+- [ ] **KiCad schematics + ERC for production handle/receiver boards.** Only
+  `receiver-bench` has a KiCad project today
+  (`DEVELOPMENT/receiver/schematics/kicad/receiver-bench/`), and it's the
+  bench rig, not `handle-prod`/`receiver-prod`. Once the Nucleo-carrier-vs-
+  bare-chip decision above is made, need real schematics for both production
+  boards and a KiCad ERC pass (unconnected pins, driver conflicts, missing
+  power flags) before sending anything to PCBWay.
+- [ ] **Production throttle (trigger) position sensor — rotary vs. linear,
+  no leading candidate yet.** handle-prod's trigger is currently wired to a
+  rotary pot (see `DEVELOPMENT/handle/handle-prod/docs/wiring.md` "Trigger"),
+  but that's the bring-up part, not a production decision - open question is
+  what sensor type actually ships in the production trigger mechanism: rotary
+  pot (simplest, matches what's already proven on the bench) vs. linear/slide
+  pot (may suit a different trigger-lever geometry or travel feel better).
+  Need to figure out where to even start evaluating this.
 - [ ] **Handle kill switch is a bench-test stand-in, not the real part.**
   `handle-prod` is currently bench-testing with a normally-open switch
   bridged closed by a jumper wire, purely to unblock testing everything
