@@ -51,9 +51,65 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   coupled noise can pull it toward "kill". `KILL_DEBOUNCE_MS` rejects short
   spikes but not sustained EMI. Add ferrite chokes + twisted/shielded kill
   wiring and route away from the CDI/coil.
+- [ ] **Multi-unit isolation — prevent a foreign handle from controlling this
+  receiver.** Today every handle/receiver pair built from this code uses the
+  *identical* hardcoded nRF24 address (`PLACEHOLDER_ADDR` = `0xE7E7E7E7E7`)
+  and channel (`PLACEHOLDER_RF_CHANNEL` = 76, see `src/common/nrf24.c`).
+  Nothing in the packet (`sync`/`seq`/`throttle`/`flags`/`crc8`) carries any
+  device identity, so two pilots' rigs within radio range are indistinguishable
+  to each other's receivers — a receiver would accept a well-formed
+  KILL/START/THROTTLE packet from *any* handle, not just its own. **Leaning
+  fix:** assign each manufactured handle+receiver pair a unique 5-byte nRF24
+  address, burned into both firmwares as a compile-time constant (like a
+  serial number), replacing the placeholder — hardware-level address matching
+  means a foreign packet is never even received by the MCU, no packet format
+  change needed, no runtime pairing handshake (consistent with ADR 0001's
+  no-ack rationale and this project's compile-time-constants-only
+  philosophy). Considered and set aside as the primary fix: per-pair channel
+  (channel is a scarcer resource already earmarked for interference avoidance
+  below — don't conflate the two; could still be a bonus secondary layer) and
+  a device-ID in the 3 reserved `flags` bits (software-only check that runs
+  after the packet is already received, and only 8 distinct values — not
+  enough for a real fleet; leave those bits reserved). **Allocation scheme
+  decided (recording only — not yet wired into firmware):** address =
+  `0xE7 0xE7 0xE7 0xE7 <N>`, where `<N>` is a one-byte sequential unit number.
+  `0x00` stays reserved as an "unassigned/placeholder" marker (so a unit still
+  on `PLACEHOLDER_ADDR` is obviously unfinished) and `0xFF` is reserved for a
+  possible future broadcast/test address; assignable range is `0x01`–`0xFE`
+  (254 pairs). Numbers are assigned sequentially — never reused, even for a
+  retired unit — and logged the moment they're assigned in the new append-only
+  `docs/UNIT-REGISTRY.md`. Still open: how a unit's assigned address actually
+  gets into its firmware image at build time (per-unit config header vs. build
+  flag) — implementation work for when this is picked back up in code, not a
+  documentation question. Worth its own ADR once that build-time mechanism is
+  also decided.
 
 ## Hardware decisions
 
+- [ ] **Production PCB approach — Nucleo carrier board vs. bare STM32L432KC.**
+  Need to decide, before ordering from PCBWay (or similar), whether production
+  `handle-prod`/`receiver-prod` units keep the Nucleo-32 L432KC dev board
+  soldered onto a custom carrier PCB that just breaks out its pins, or move to
+  a from-scratch board built around the bare STM32L432KC chip. The bare-chip
+  route drops dev-board cost/size but takes on power supervisor, crystal,
+  ST-Link/debug header, and boot-mode strapping that the Nucleo currently
+  provides for free (ADR 0006 chose the Nucleo for bring-up; this is the
+  separate question of what production actually ships on).
+- [ ] **KiCad schematics + ERC for production handle/receiver boards.** Only
+  `receiver-bench` has a KiCad project today
+  (`DEVELOPMENT/receiver/schematics/kicad/receiver-bench/`), and it's the
+  bench rig, not `handle-prod`/`receiver-prod`. Once the Nucleo-carrier-vs-
+  bare-chip decision above is made, need real schematics for both production
+  boards and a KiCad ERC pass (unconnected pins, driver conflicts, missing
+  power flags) before sending anything to PCBWay.
+- [ ] **Production throttle (trigger) position sensor — rotary vs. linear,
+  no leading candidate yet.** handle-prod's trigger is currently wired to a
+  rotary pot (see `DEVELOPMENT/handle/handle-prod/docs/wiring.md` "Trigger"),
+  but that's the bring-up part, not a production decision - open question is
+  what sensor type actually ships in the production trigger mechanism: rotary
+  pot (simplest, matches what's already proven on the bench) vs. linear/slide
+  pot (may suit a different trigger-lever geometry or travel feel better).
+  Need to figure out where to even start evaluating this.
 - [ ] **Handle kill switch is a bench-test stand-in, not the real part.**
   `handle-prod` is currently bench-testing with a normally-open switch
   bridged closed by a jumper wire, purely to unblock testing everything
@@ -98,12 +154,28 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
 - [ ] **Channel selection** — pick a channel clear of both local WiFi and the
   engine's worst harmonic bands; consider scanning on boot. Buy the module from a
   reputable supplier (not clones — mismatched PA/LNA erases the margin).
+  (Scoped to interference avoidance only — see "Multi-unit isolation" above
+  for preventing cross-talk between two pilots' rigs.)
 - [x] **Receiver power source** — dedicated receiver battery (isolated from the
   engine's starter battery to avoid crank brown-out / EMI). See ADR 0005.
 - [ ] **Servo power architecture (decision)** — servo transients are large; decide
   between (a) servo on the receiver pack via a dedicated BEC/regulator rail with
   bulk capacitance while MCU+radio sit on a cleaner rail, or (b) a separate servo
   battery. Sized after servo selection.
+  **Current leaning (2026-08-09, not finalized):** receiver + servo on a **2S
+  18650 pack** (7.4–8.4V) through a buck/BEC down to 5V for both the servo
+  and the board; handle on a **single 1S 18650** (3.7–4.2V) through a boost
+  module, since it has no servo and just needs clean 3.3–5V logic power
+  (cheap combined boost+USB-C-charge modules exist for exactly this).
+  Real open sub-questions, not yet resolved:
+  - Whether the Nucleo-32 L432KC's 5V/VIN pins tolerate direct external
+    injection when not USB-powered — needs checking against the datasheet,
+    not assumed.
+  - BEC/boost current sizing depends on the still-unselected servo's
+    stall/running current.
+  - **Runtime target: ≥2 hours of continuous servo operation** — a real
+    sizing constraint for both pack capacity and servo current draw once
+    the servo is picked.
 - [ ] **Receiver battery chemistry/voltage** — pick the receiver pack, then
   replace the placeholder mV values in `RX_BATT` and `read_battery_mv()`'s
   divider scaling with measured values. (Handle-side battery monitoring was
@@ -130,7 +202,31 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   blink rate instead of a dedicated bar/buzzer (see `prod_app.c`). The
   bar/buzzer math in `battery_monitor.h` (`battery_eval`/`battery_buzzer_on`)
   stays as general-purpose, unit-tested logic but isn't wired to real
-  hardware on either board.
+  hardware on either board. The "standalone battery meters" referenced here
+  are now on hand - see the next item.
+- [ ] **Battery capacity indicator modules ordered (2026-08-09).** Two
+  kinds, one for each pack, both purely passive - 2-wire, connected straight
+  across the battery terminals, no GPIO/ADC pins on either board and no
+  firmware involvement at all:
+  - Generic "1-8S universal" module: select the cell-count pad (S1-S8,
+    solder-bridge one only) to match the pack; red 7-segment-style digits,
+    4-level blue/green bar display. 3-34V working range, 5mA draw,
+    -20-50°C. Not waterproof.
+  - DGZZI 1S-specific module: fixed for a single cell (3.7-4.2V), 4-level
+    red/orange/green bar (red ~5%, orange ~50%, green 75-100%). Also not
+    waterproof.
+  - Neither needs a decision before wiring - just connect to whichever pack
+    ends up on each board once "Servo power architecture" above is settled.
+- [ ] **Charging board compatibility (note for purchasing).** 1S and 2S
+  packs need **different** charge modules - not interchangeable. A
+  1S-rated board (e.g. common TP4056-style USB-C modules) caps out around
+  4.2V and will undercharge a 2S pack; a 2S-rated charge board outputs
+  ~8.4V and would overcharge a single cell. Series vs. parallel matters
+  specifically for charging (parallel keeps it single-cell-equivalent
+  voltage; series does not). For the 2S receiver pack, also get a board
+  with a **balance** tap/connector - a plain series-only charger without
+  balancing lets the two cells drift apart in capacity over many cycles,
+  which shortens pack life and risks over-discharging one cell.
 - [x] **Cruise / accessory switch wiring** — momentary pushbuttons for cruise,
   AUX1 (strobe), and AUX2 (smoke), all "closed = on" with pull-downs (kill
   and start are the pull-up exceptions). AUX1 is latched in firmware

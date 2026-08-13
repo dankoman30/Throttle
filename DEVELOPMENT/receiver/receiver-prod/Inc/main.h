@@ -81,8 +81,8 @@ void Error_Handler(void);
 #define AUX1_OUT_GPIO_Port GPIOA
 #define AUX2_OUT_Pin GPIO_PIN_10
 #define AUX2_OUT_GPIO_Port GPIOA
-#define LED_BLUE_Pin GPIO_PIN_11
-#define LED_BLUE_GPIO_Port GPIOA
+#define CRUISE_LED_Pin GPIO_PIN_11
+#define CRUISE_LED_GPIO_Port GPIOA
 #define SWDIO_Pin GPIO_PIN_13
 #define SWDIO_GPIO_Port GPIOA
 #define SWCLK_Pin GPIO_PIN_14

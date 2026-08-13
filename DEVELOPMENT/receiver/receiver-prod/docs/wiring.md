@@ -22,13 +22,13 @@ name)**.
 | Kill relay | A3 | PA4 (`KILL_RELAY`) | out | **Not yet wired** — see "Known gaps" |
 | Servo PWM | A4 | PA5 (`TIM2_CH1`) | out | 50Hz, see "Servo" below |
 | Battery sense | A5 | PA6 (`BATT_SENSE`, `ADC1_IN11`) | analog in | **Not yet wired** — see "Known gaps" |
-| Tri-color LED red | A6 | PA7 (`LED_RED`) | out | |
+| Status LED red | A6 | PA7 (`LED_RED`) | out | |
 | Local start button | D3 | PB0 (`LOCAL_START_BTN`) | in, internal pull-up | |
 | Starter relay | D6 | PB1 (`STARTER_RELAY`) | out | **Not yet wired** — see "Known gaps" |
-| Tri-color LED green | D9 | PA8 (`LED_GREEN`) | out | |
+| Status LED green | D9 | PA8 (`LED_GREEN`) | out | |
 | AUX1 (lights, placeholder LED for now) | D1/TX | PA9 (`AUX1_OUT`) | out | |
 | AUX2 (smoke, placeholder LED for now) | D0/RX | PA10 (`AUX2_OUT`) | out | Removed 2026-08-08 to save a pin on the handle, restored 2026-08-09 once pins freed up elsewhere on that board — never actually un-assigned here, so no CubeMX changes were needed. |
-| Tri-color LED blue | D10 | PA11 (`LED_BLUE`) | out | |
+| Cruise indicator LED | D10 | PA11 (`CRUISE_LED`, relabeled from `LED_BLUE` 2026-08-09) | out | Same pin, now drives a standalone single-color blue LED instead of the tri-color package's blue lead — see "Status LED" below. |
 | Radio SCK | D13 | PB3 (`SPI1_SCK`) | out | onboard LD3 flickers with SPI clock — harmless |
 | Radio MISO | D12 | PB4 (`SPI1_MISO`) | in | |
 | Radio MOSI | D11 | PB5 (`SPI1_MOSI`) | out | |
@@ -74,7 +74,12 @@ should hold for any standard-protocol servo.
   switch to a separate 5V supply, grounds still tied together.
 - **Orange → A4 (PA5)** (signal)
 
-## Tri-color status LED
+## Status LED (red + green — bi-color, not the original tri-color package)
+
+**2026-08-09: the tri-color package's blue lead was disconnected** — status
+now only needs red+green (see "Behavior" below), and blue was freed up for
+a separate, dedicated cruise indicator instead (see "Cruise indicator LED"
+below). The red/green wiring/pins are unchanged from before.
 
 **Confirmed common cathode** — verified directly: common (longest) pin to
 GND, red pin through a 220Ω resistor to 3.3V, lit red. Matches what
@@ -85,22 +90,37 @@ Common, Red, reading across the 4 leads in order — equivalently R-C-G-B
 from the other end). The common (C) pin is the longest lead; it's the
 *second* pin from the blue end, not an outer pin, so it's easy to
 miscount by one under this specific part — check the long lead, not just
-position, before wiring.
+position, before wiring. (Still relevant even with blue disconnected,
+since the package's physical layout hasn't changed — only its blue lead
+is now unwired.)
 
 - Common (longest lead, 2nd from the blue end) → **GND**
 - Red (outer pin, opposite end from blue) → 220Ω resistor → **A6 (PA7)**
 - Green (between blue and common) → 220Ω resistor → **D9 (PA8)**
-- Blue (outer pin, opposite end from red) → 220Ω resistor → **D10 (PA11)**
+- Blue (outer pin, opposite end from red) → **disconnected** — was
+  → 220Ω resistor → `PA11`, now freed for the cruise LED below.
 
 220Ω was chosen because it's already confirmed working on the red channel;
-green/blue LEDs typically have a higher forward voltage than red, so they
-may read visibly dimmer at the same resistor value — fine for a first pass,
-worth individually tuning later if the brightness mismatch bothers you.
+green typically has a higher forward voltage than red, so it may read
+visibly dimmer at the same resistor value — fine for a first pass, worth
+individually tuning later if the brightness mismatch bothers you.
 
-**Behavior** (see `prod_app.h` for the authoritative writeup): red blinks as
-a heartbeat while armed (faster if the receiver's own battery is low),
-solid red when killed; green lights only on a voluntary release from
-cranking (never a forced stop); blue is on while actively cranking.
+**Behavior** (see `prod_app.h` for the authoritative writeup, priority
+highest first): killed → red, long-long blink; cranking (`STATE_STARTING`)
+→ yellow (red+green together), solid; running proxy (latched on a
+voluntary release from cranking, never a forced stop) → green, solid;
+default/armed-never-started → red, lub-dub heartbeat (faster if the
+receiver's own battery is low). This is what shows right after boot or a
+re-arm — not green, unlike before this change.
+
+## Cruise indicator LED
+
+**New 2026-08-09**, standalone single-color blue LED (not part of the
+tri-color package above) — same wiring style as the AUX1/AUX2 indicator
+LEDs below: **D10 (PA11)** → 220–330Ω resistor → LED anode → LED cathode
+→ GND. Solid while `g_cruise_active` (receiver_firmware.c) is set, off
+otherwise — see `prod_app.h` for the full writeup. Independent of the
+status LED's state model entirely.
 
 ## Local start button
 
