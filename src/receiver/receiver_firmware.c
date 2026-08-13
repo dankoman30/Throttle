@@ -199,18 +199,25 @@ static void start_tick(void) {
     g_start_req_prev = start_req;
 }
 
-/* Accessory outputs (AUX1 strobe, AUX2 smoke). NON-safety, deliberately
- * kept out of the kill/start/throttle state machine: each simply tracks
- * its command-flag level on every valid packet, so a dropped packet only
- * delays a change by one TX period and self-heals. This receiver doesn't
- * know or care that the handle latches AUX1 (toggle) and leaves AUX2
- * purely momentary - both arrive as plain level flags either way. Cruise
- * (CMD_FLAG_CRUISE) needs no action here - the handle already froze the
- * throttle it sent, so the value flows through the normal rate-limited
- * throttle path transparently.
- * Stored into g_aux1_state/g_aux2_state, not just written straight to a
- * HAL call, so a real board's own driver code can read the latest
- * commanded state independent of packet arrival - same
+/* Accessory outputs (AUX1 strobe, AUX2 smoke) plus the cruise indicator.
+ * NON-safety, deliberately kept out of the kill/start/throttle state
+ * machine: each simply tracks its command-flag level on every valid
+ * packet, so a dropped packet only delays a change by one TX period and
+ * self-heals. This receiver doesn't know or care that the handle latches
+ * AUX1 (toggle) and leaves AUX2 purely momentary - both arrive as plain
+ * level flags either way. Cruise (CMD_FLAG_CRUISE) needs no CONTROL action
+ * here - the handle already froze the throttle it sent, so the value
+ * flows through the normal rate-limited throttle path transparently -
+ * g_cruise_active exists purely so a real board's cruise indicator LED
+ * has something to read; nothing in this file's control flow depends on
+ * it. Called on every valid packet including KILL ones (see
+ * on_packet_received()), and the handle already never sets CMD_FLAG_CRUISE
+ * in the same packet as CMD_FLAG_KILL (kill suppresses cruise on that
+ * side), so g_cruise_active naturally clears on a kill packet without
+ * needing a special case here.
+ * Stored into g_aux1_state/g_aux2_state/g_cruise_active, not just written
+ * straight to a HAL call, so a real board's own driver code can read the
+ * latest commanded state independent of packet arrival - same
  * externally-observed-state pattern already used for
  * g_state/g_current_servo_throttle elsewhere in this file (see
  * DEVELOPMENT/receiver/firmware/Src/bench_app.c for the precedent).
@@ -219,12 +226,14 @@ static void start_tick(void) {
  * docs/OPEN-ITEMS.md.) */
 static bool g_aux1_state = false;
 static bool g_aux2_state = false;
+static bool g_cruise_active = false;
 
 static void apply_aux_outputs(const throttle_packet_t *pkt) {
     g_aux1_state = (pkt->flags & CMD_FLAG_AUX1) != 0;
     // HAL_GPIO_WritePin(AUX1_OUT_GPIO_Port, AUX1_OUT_Pin, g_aux1_state ? GPIO_PIN_SET : GPIO_PIN_RESET);
     g_aux2_state = (pkt->flags & CMD_FLAG_AUX2) != 0;
     // HAL_GPIO_WritePin(AUX2_OUT_GPIO_Port, AUX2_OUT_Pin, g_aux2_state ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    g_cruise_active = (pkt->flags & CMD_FLAG_CRUISE) != 0;
 }
 
 /* --- Local battery monitor (receiver side) --- identical scheme to the

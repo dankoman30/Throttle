@@ -39,6 +39,7 @@
 #include "adc.h"
 #include "spi.h"
 
+#include "led_blink.h"
 #include "nrf24.c"
 
 #define HANDLE_PROD_BOARD
@@ -47,33 +48,59 @@
 /* --- Radio --- */
 static nrf24_handle_t g_radio;
 
-/* --- Status LED: see handle_app.h for the full color/priority writeup --- */
-#define LED_BLINK_PERIOD_MS 200u
+/* --- Status LED: see handle_app.h for the full color/priority writeup.
+ * Same priority-table shape and src/common/led_blink.h patterns as the
+ * receiver's prod_status_led_tick(), so both boards' red channel means
+ * the same thing with byte-identical timing. --- */
+static blink_state_t g_handle_kill_blink = {0, 0};
+static blink_state_t g_handle_heartbeat_blink = {0, 0};
 
-static void handle_app_led_tick(uint32_t now) {
-    static uint32_t last_blink_ms = 0;
-    static bool blink_on = false;
+/* Running-proxy latch: no telemetry exists to confirm the engine is
+ * actually running, so this is a local-only proxy - a fresh rising edge of
+ * g_start_hold_confirmed clears it (starting a new attempt), a falling
+ * edge (release) sets it (presumed running), kill also clears it. Mirrors
+ * the receiver's own running-proxy rule (voluntary release, tracked
+ * there) as closely as this board's local-only information allows. */
+static bool g_handle_running_proxy = false;
+static bool g_handle_prev_start_hold = false;
 
-    bool red = false, green = false, blue = false;
-
+static void handle_app_update_running_proxy(void) {
+    bool start_hold_now = g_start_hold_confirmed;
     if (g_kill_latched) {
-        if ((now - last_blink_ms) >= LED_BLINK_PERIOD_MS) {
-            last_blink_ms = now;
-            blink_on = !blink_on;
-        }
-        red = blink_on;
-    } else if (g_cruise_engaged) {
-        blue = true;
+        g_handle_running_proxy = false;
+    } else if (start_hold_now && !g_handle_prev_start_hold) {
+        g_handle_running_proxy = false; /* fresh crank attempt */
+    } else if (!start_hold_now && g_handle_prev_start_hold) {
+        g_handle_running_proxy = true; /* released -> presumed running */
+    }
+    g_handle_prev_start_hold = start_hold_now;
+}
+
+static void handle_app_status_led_tick(uint32_t now) {
+    handle_app_update_running_proxy();
+
+    bool red = false, green = false;
+    if (g_kill_latched) {
+        red = blink_pattern_tick(KILL_PATTERN, KILL_PATTERN_LEN, &g_handle_kill_blink, now, 100u);
     } else if (g_start_hold_confirmed) {
         red = true;
         green = true; /* yellow */
-    } else {
+    } else if (g_handle_running_proxy) {
         green = true;
+    } else {
+        red = blink_pattern_tick(HEARTBEAT_PATTERN, HEARTBEAT_PATTERN_LEN, &g_handle_heartbeat_blink, now, 100u);
     }
 
     HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, red ? GPIO_PIN_SET : GPIO_PIN_RESET);
     HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, green ? GPIO_PIN_SET : GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, blue ? GPIO_PIN_SET : GPIO_PIN_RESET);
+}
+
+/* Cruise indicator: separate, dedicated LED (physically relocated off the
+ * old tri-color package's blue lead - see docs/wiring.md), reading the
+ * existing g_cruise_engaged - no logic change from before, just relocated
+ * off the status LED. */
+static void handle_app_cruise_led_tick(void) {
+    HAL_GPIO_WritePin(CRUISE_LED_GPIO_Port, CRUISE_LED_Pin, g_cruise_engaged ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 
 /* AUX1/AUX2 indicator LEDs: mirror what THIS board is commanding, not
@@ -94,7 +121,7 @@ void handle_app_init(void) {
 
     HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(CRUISE_LED_GPIO_Port, CRUISE_LED_Pin, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(AUX1_LED_GPIO_Port, AUX1_LED_Pin, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(AUX2_LED_GPIO_Port, AUX2_LED_Pin, GPIO_PIN_RESET);
 }
@@ -109,6 +136,7 @@ void handle_app_tick(void) {
         nrf24_send_payload(&g_radio, (const uint8_t *)&g_last_packet, PACKET_SIZE);
     }
 
-    handle_app_led_tick(now);
+    handle_app_status_led_tick(now);
+    handle_app_cruise_led_tick();
     handle_app_aux_led_tick();
 }

@@ -53,12 +53,12 @@ void MX_GPIO_Init(void)
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, AUX1_LED_Pin|NRF_CE_Pin|NRF_CSN_Pin|LED_RED_Pin
-                          |LED_GREEN_Pin|LED_BLUE_Pin|AUX2_LED_Pin, GPIO_PIN_RESET);
+                          |LED_GREEN_Pin|CRUISE_LED_Pin|AUX2_LED_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pins : AUX1_LED_Pin NRF_CE_Pin NRF_CSN_Pin LED_RED_Pin
-                           LED_GREEN_Pin LED_BLUE_Pin AUX2_LED_Pin */
+                           LED_GREEN_Pin CRUISE_LED_Pin AUX2_LED_Pin */
   GPIO_InitStruct.Pin = AUX1_LED_Pin|NRF_CE_Pin|NRF_CSN_Pin|LED_RED_Pin
-                          |LED_GREEN_Pin|LED_BLUE_Pin|AUX2_LED_Pin;
+                          |LED_GREEN_Pin|CRUISE_LED_Pin|AUX2_LED_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;

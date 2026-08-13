@@ -23,7 +23,7 @@ given as **Arduino label (STM32 name)**.
 | AUX1 switch (strobe) | D6 | PB1 (`AUX1_SW`) | in, pull-down | - (internal) | momentary button, but **latched in firmware** (toggle on/off) - other leg to **3V3**, not GND |
 | Status LED red | D9 | PA8 (`LED_RED`) | out | 220Ω | |
 | Status LED green | D1/TX | PA9 (`LED_GREEN`) | out | 220Ω | |
-| Status LED blue | D0/RX | PA10 (`LED_BLUE`) | out | 220Ω | |
+| Cruise indicator LED | D0/RX | PA10 (`CRUISE_LED`, relabeled from `LED_BLUE` 2026-08-09) | out | 220–330Ω | Same pin, now drives a standalone single-color blue LED instead of the tri-color package's blue lead — see "Status LED" below. |
 | AUX2 indicator LED | D10 | PA11 (`AUX2_LED`) | out | 220–330Ω | mirrors this board's own live AUX2 level |
 | Radio SCK | D13 | PB3 (`SPI1_SCK`) | out | - | onboard LD3 flickers with SPI clock - harmless |
 | Radio MISO | D12 | PB4 (`SPI1_MISO`) | in | - | |
@@ -139,7 +139,11 @@ receiver-prod's original AUX test LEDs:
 - AUX2: **D10 (PA11)** → 220–330Ω resistor → LED anode → LED cathode →
   GND. Lit while the AUX2 button is actively held.
 
-## Status LED
+## Status LED (red + green — bi-color, not the original tri-color package)
+
+**2026-08-09: the tri-color package's blue lead was disconnected** - status
+now only needs red+green (see "Behavior" below), and blue was freed up for
+the separate cruise indicator instead (see "Cruise indicator LED" below).
 
 **Confirm common-cathode and the physical pin order before wiring** - do
 not assume this is the identical part/pinout as receiver-prod's LED even if
@@ -150,10 +154,25 @@ a resistor → 3.3V, confirm which physical lead lights which color).
 - Common → **GND**
 - Red → 220Ω resistor → **D9 (PA8)**
 - Green → 220Ω resistor → **D1/TX (PA9)**
-- Blue → 220Ω resistor → **D0/RX (PA10)**
+- Blue → **disconnected** - was → 220Ω resistor → `PA10`, now freed for
+  the cruise LED below.
 
-See `DEVELOPMENT/handle/handle-prod/Inc/handle_app.h` for the color/priority
-behavior (kill blink > cruise blue > start-hold yellow > idle green).
+**Behavior** (see `DEVELOPMENT/handle/handle-prod/Inc/handle_app.h` for the
+authoritative writeup, priority highest first): kill latched → red,
+long-long blink; holding start → yellow (red+green together), solid;
+running proxy (latched on release of a confirmed start-hold, never a
+telemetry-confirmed fact) → green, solid; default/armed-never-started →
+red, lub-dub heartbeat. This is what shows right after boot or a re-arm -
+not green, unlike before this change.
+
+## Cruise indicator LED
+
+**New 2026-08-09**, standalone single-color blue LED (not part of the
+tri-color package above) - same wiring style as the AUX1/AUX2 indicator
+LEDs: **D0/RX (PA10)** → 220–330Ω resistor → LED anode → LED cathode →
+GND. Solid while `g_cruise_engaged` is set, off otherwise - no logic
+change from before, just relocated off the status LED. Independent of the
+status LED's state model entirely.
 
 ## Known gaps — deliberately left unconnected
 
