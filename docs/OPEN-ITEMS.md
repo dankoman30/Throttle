@@ -65,7 +65,11 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   means a foreign packet is never even received by the MCU, no packet format
   change needed, no runtime pairing handshake (consistent with ADR 0001's
   no-ack rationale and this project's compile-time-constants-only
-  philosophy). Considered and set aside as the primary fix: per-pair channel
+  philosophy). **Compile-time vs. a hardware DIP/rotary switch for setting
+  the address in the field was explicitly weighed and decided against - see
+  ADR 0009** (no spare pins on the handle to read a switch bank, and a
+  physical switch is a real vibration-induced failure mode on this
+  vehicle). Considered and set aside as the primary fix: per-pair channel
   (channel is a scarcer resource already earmarked for interference avoidance
   below — don't conflate the two; could still be a bonus secondary layer) and
   a device-ID in the 3 reserved `flags` bits (software-only check that runs
@@ -81,8 +85,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   `docs/UNIT-REGISTRY.md`. Still open: how a unit's assigned address actually
   gets into its firmware image at build time (per-unit config header vs. build
   flag) — implementation work for when this is picked back up in code, not a
-  documentation question. Worth its own ADR once that build-time mechanism is
-  also decided.
+  documentation question.
 
 ## Hardware decisions
 
