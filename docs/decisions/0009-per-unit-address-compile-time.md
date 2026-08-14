@@ -50,6 +50,31 @@ image + hardware config step) — real manufacturing friction the switch
 approach would have avoided. Mitigated by keeping the per-unit value
 physically visible another way: a printed label on the unit showing its
 assigned number, matching its `docs/UNIT-REGISTRY.md` row, so pairing
-stays visually verifiable without adding hardware. The exact per-unit
-build mechanism (config header vs. build flag) is implementation work,
-tracked in the "Multi-unit isolation" `docs/OPEN-ITEMS.md` item.
+stays visually verifiable without adding hardware.
+
+## Implementation (2026-08-14)
+
+- `src/common/unit_config.h` — the per-unit config header, **tracked in
+  git** with `UNIT_NUMBER` defaulting to `0xFF` (deliberate unpaired
+  bench/test build, not the reserved-and-refused `0x00`). Building a real
+  unit means editing this locally and not committing the edit back — see
+  the file's own header comment.
+- `UNIT_NUMBER == 0x00` triggers a **compile-time `#error`** — a forgotten
+  edit doesn't just risk shipping the wrong address, it doesn't build at
+  all. This only catches "never touched"; it can't distinguish a genuine
+  registry number from a left-at-`0xFF` build someone forgot to change
+  before flashing real hardware, so `docs/OPEN-ITEMS.md` carries a
+  standing, intentionally-never-checked-off reminder for that per-build
+  discipline.
+- `nrf24_handle_t` (`src/common/nrf24.h`) gained an `addr` field, following
+  the same parameterized-not-hardcoded pattern already used for
+  `hspi`/`ce_port`/`ce_pin`/`csn_port`/`csn_pin` — `nrf24.c` stays fully
+  unit-agnostic, same as it's agnostic about which board it's running on.
+  `handle_app.c`/`prod_app.c` each build their 5-byte address from
+  `UNIT_NRF24_ADDR_PREFIX` + `UNIT_NUMBER` and set it before calling
+  `nrf24_init()`.
+- Bonus, not originally planned: test builds (`UNIT_NUMBER == 0xFF`) get a
+  hardware-visible tell — both boards' status LED heartbeat pattern
+  renders **inverted** (mostly on with brief off blips, instead of mostly
+  off with brief pulses) via `UNIT_IS_TEST_BUILD`, so a bench/test unit is
+  visually unmistakable from a real paired one without needing a debugger.

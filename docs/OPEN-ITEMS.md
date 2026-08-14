@@ -51,17 +51,20 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   coupled noise can pull it toward "kill". `KILL_DEBOUNCE_MS` rejects short
   spikes but not sustained EMI. Add ferrite chokes + twisted/shielded kill
   wiring and route away from the CDI/coil.
-- [ ] **Multi-unit isolation — prevent a foreign handle from controlling this
-  receiver.** Today every handle/receiver pair built from this code uses the
-  *identical* hardcoded nRF24 address (`PLACEHOLDER_ADDR` = `0xE7E7E7E7E7`)
-  and channel (`PLACEHOLDER_RF_CHANNEL` = 76, see `src/common/nrf24.c`).
-  Nothing in the packet (`sync`/`seq`/`throttle`/`flags`/`crc8`) carries any
-  device identity, so two pilots' rigs within radio range are indistinguishable
-  to each other's receivers — a receiver would accept a well-formed
-  KILL/START/THROTTLE packet from *any* handle, not just its own. **Leaning
-  fix:** assign each manufactured handle+receiver pair a unique 5-byte nRF24
-  address, burned into both firmwares as a compile-time constant (like a
-  serial number), replacing the placeholder — hardware-level address matching
+- [x] **Multi-unit isolation — prevent a foreign handle from controlling this
+  receiver.** **Mechanism implemented 2026-08-14** (see below for the
+  per-build discipline this still requires - that part is intentionally
+  never "done"). Previously, every handle/receiver pair built from this
+  code used the *identical* hardcoded nRF24 address (`PLACEHOLDER_ADDR` =
+  `0xE7E7E7E7E7`) and channel (`PLACEHOLDER_RF_CHANNEL` = 76, see
+  `src/common/nrf24.c`). Nothing in the packet (`sync`/`seq`/`throttle`/
+  `flags`/`crc8`) carries any device identity, so two pilots' rigs within
+  radio range were indistinguishable to each other's receivers — a
+  receiver would accept a well-formed KILL/START/THROTTLE packet from
+  *any* handle, not just its own. **Fix:** each manufactured handle+
+  receiver pair gets a unique 5-byte nRF24 address, burned into both
+  firmwares as a compile-time constant (like a serial number), replacing
+  the placeholder — hardware-level address matching
   means a foreign packet is never even received by the MCU, no packet format
   change needed, no runtime pairing handshake (consistent with ADR 0001's
   no-ack rationale and this project's compile-time-constants-only
@@ -81,11 +84,34 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   on `PLACEHOLDER_ADDR` is obviously unfinished) and `0xFF` is reserved for a
   possible future broadcast/test address; assignable range is `0x01`–`0xFE`
   (254 pairs). Numbers are assigned sequentially — never reused, even for a
-  retired unit — and logged the moment they're assigned in the new append-only
-  `docs/UNIT-REGISTRY.md`. Still open: how a unit's assigned address actually
-  gets into its firmware image at build time (per-unit config header vs. build
-  flag) — implementation work for when this is picked back up in code, not a
-  documentation question.
+  retired unit — and logged the moment they're assigned in the append-only
+  `docs/UNIT-REGISTRY.md`. **Build-time mechanism (resolved):** a per-unit
+  config header, `src/common/unit_config.h` — **tracked in git**, default
+  `UNIT_NUMBER 0xFF` (deliberate unpaired bench/test build marker, not the
+  reserved-but-refused `0x00`). `nrf24_handle_t` gained an `addr` field
+  (same parameterized-not-hardcoded pattern as `hspi`/`ce_port`/etc.);
+  `handle_app.c`/`prod_app.c` each build their 5-byte address from
+  `UNIT_NRF24_ADDR_PREFIX` + `UNIT_NUMBER` and set it before calling
+  `nrf24_init()`. `UNIT_NUMBER == 0x00` is a hard **compile-time `#error`**
+  — the build itself refuses to produce a binary if the placeholder was
+  never edited, not just a warning. Test builds (`UNIT_NUMBER == 0xFF`)
+  also get a visual "this is not a paired unit" cue: both boards' status
+  LED heartbeat renders **inverted** (mostly on with brief off blips,
+  instead of mostly off with brief pulses) — see `UNIT_IS_TEST_BUILD` in
+  `unit_config.h`.
+- [ ] **⚠️ STANDING REMINDER — confirm `UNIT_NUMBER` before every real
+  build. Intentionally never checked off.** Before flashing a unit meant
+  to actually ship/fly as a real paired production unit, open
+  `src/common/unit_config.h` and confirm `UNIT_NUMBER` is set to that
+  pair's real assigned number from `docs/UNIT-REGISTRY.md` — **not** the
+  tracked default (`0xFF`). The compile-time `#error` only catches the
+  `0x00` case (file never touched at all); it cannot tell a genuine
+  registry number apart from a left-at-`0xFF` bench build someone forgot
+  to change before flashing real hardware. After flashing, revert the
+  local edit (or otherwise make sure the real per-unit value never gets
+  committed back to this file — see the comment in `unit_config.h`
+  itself). This line should stay in this document, unchecked, permanently
+  — it is a process discipline check, not a one-time task.
 
 ## Hardware decisions
 
