@@ -23,12 +23,12 @@
  * assuming 1Mbps should stay the production data rate. */
 #define RF_SETUP_1MBPS_PA_HIGH  0x06u
 
-/* Placeholder RF channel and address - NOT the final ADR 0005 channel
- * selection (still open, see docs/OPEN-ITEMS.md "Channel selection").
- * Only needs to match on both ends; revisit once real channel-selection
- * testing happens. */
+/* Placeholder RF channel - NOT the final ADR 0005 channel selection (still
+ * open, see docs/OPEN-ITEMS.md "Channel selection"). Only needs to match
+ * on both ends; revisit once real channel-selection testing happens.
+ * (Address is no longer a placeholder here - see nrf24_handle_t.addr and
+ * src/common/unit_config.h.) */
 #define PLACEHOLDER_RF_CHANNEL  76u
-static const uint8_t PLACEHOLDER_ADDR[5] = { 0xE7, 0xE7, 0xE7, 0xE7, 0xE7 };
 
 #define NRF24_MAX_MULTIBYTE_LEN 5u /* max real use: 5-byte address registers */
 
@@ -124,8 +124,8 @@ void nrf24_init(const nrf24_handle_t *nrf) {
     nrf24_write_reg(nrf, NRF24_REG_SETUP_RETR, 0x00u);      /* no retries, matches no-ack */
     nrf24_write_reg(nrf, NRF24_REG_RF_CH, PLACEHOLDER_RF_CHANNEL);
     nrf24_write_reg(nrf, NRF24_REG_RF_SETUP, RF_SETUP_1MBPS_PA_HIGH);
-    nrf24_write_reg_n(nrf, NRF24_REG_RX_ADDR_P0, PLACEHOLDER_ADDR, 5);
-    nrf24_write_reg_n(nrf, NRF24_REG_TX_ADDR, PLACEHOLDER_ADDR, 5);
+    nrf24_write_reg_n(nrf, NRF24_REG_RX_ADDR_P0, nrf->addr, 5);
+    nrf24_write_reg_n(nrf, NRF24_REG_TX_ADDR, nrf->addr, 5);
     nrf24_write_reg(nrf, NRF24_REG_RX_PW_P0, (uint8_t)PACKET_SIZE);
 
     /* PRIM_RX left 0 (PTX) - matches nrf24_enter_tx_mode()'s state, so a

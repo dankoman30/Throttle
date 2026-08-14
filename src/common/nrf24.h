@@ -19,9 +19,11 @@
  * necessarily share the same SPI peripheral or CE/CSN pins - can each
  * instantiate their own; nothing here is a hardcoded global.
  *
- * RF channel/address are still bring-up placeholders (see
- * docs/OPEN-ITEMS.md "Channel selection"), and RF_SETUP defaults to 1Mbps
- * rather than the originally-intended 250kbps as a bring-up diagnostic
+ * RF channel is still a bring-up placeholder (see docs/OPEN-ITEMS.md
+ * "Channel selection") - address is NOT: each caller supplies its own
+ * per-unit address via nrf24_handle_t.addr (see src/common/unit_config.h
+ * and docs/decisions/0009-per-unit-address-compile-time.md). RF_SETUP
+ * defaults to 1Mbps rather than the originally-intended 250kbps as a bring-up diagnostic
  * finding, not a final data-rate decision - see the 2026-08-06 addendum in
  * docs/decisions/0005-radio-choice-and-ignition-emi.md before assuming
  * either holds on production (non-clone) hardware.
@@ -67,20 +69,27 @@
 #define NRF24_STATUS_TX_DS     (1u << 5)
 #define NRF24_STATUS_MAX_RT    (1u << 4)
 
-/* One nRF24L01+ instance's SPI peripheral and CE/CSN GPIO pins. Handle and
- * receiver each declare and initialize their own - do not assume they
- * share a SPI peripheral or pin assignment. */
+/* One nRF24L01+ instance's SPI peripheral, CE/CSN GPIO pins, and per-unit
+ * address. Handle and receiver each declare and initialize their own - do
+ * not assume they share a SPI peripheral or pin assignment.
+ *
+ * addr must point to 5 bytes that stay valid for the life of the program
+ * (a static const array, not a stack/temporary buffer) - nrf24_init() only
+ * reads through the pointer, it doesn't copy. See src/common/unit_config.h
+ * for how each board's caller builds this from UNIT_NUMBER. */
 typedef struct {
     SPI_HandleTypeDef *hspi;
     GPIO_TypeDef       *ce_port;
     uint16_t            ce_pin;
     GPIO_TypeDef       *csn_port;
     uint16_t            csn_pin;
+    const uint8_t      *addr;
 } nrf24_handle_t;
 
 /* Configures the chip for this project's link: EN_AA=0x00 (no radio-level
  * ack, ADR 0001), no retries, a fixed PACKET_SIZE static payload on pipe 0,
- * matching TX_ADDR/RX_ADDR_P0. Also clears any stuck STATUS flags and
+ * matching TX_ADDR/RX_ADDR_P0 - both set from nrf->addr (caller must set
+ * this before calling). Also clears any stuck STATUS flags and
  * flushes both FIFOs first, since the chip's own power - and therefore its
  * internal state - isn't tied to the MCU's reset cycle. Leaves the chip in
  * standby-I with CE low, PRIM_RX=0 (PTX) - the same state
