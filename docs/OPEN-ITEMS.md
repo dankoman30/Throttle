@@ -172,6 +172,11 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
 - [ ] **Cable tolerance to engine movement** — the engine shifts on its rubber
   mounts relative to the frame; the cable run must flex without binding or
   shifting the throttle setpoint.
+- [ ] **Vibration dampeners for receiver mounting (2026-08-14).** The receiver
+  enclosure — and whatever battery ends up inside it, see the cell-format item
+  below — needs isolation from engine vibration, not just a rigid mount to the
+  frame. Evaluate dampening grommets/standoffs or an isolating mount plate
+  between the receiver enclosure and the frame.
 - [ ] **RF range test** — measure real handle↔receiver distance/reliability
   through frame/cage/body to confirm nRF24L01+PA+LNA gives enough margin. NOTE:
   this is a *separate* test from the engine-EMI RPM sweep above — different
@@ -191,11 +196,13 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   between (a) servo on the receiver pack via a dedicated BEC/regulator rail with
   bulk capacitance while MCU+radio sit on a cleaner rail, or (b) a separate servo
   battery. Sized after servo selection.
-  **Current leaning (2026-08-09, not finalized):** receiver + servo on a **2S
-  18650 pack** (7.4–8.4V) through a buck/BEC down to 5V for both the servo
-  and the board; handle on a **single 1S 18650** (3.7–4.2V) through a boost
-  module, since it has no servo and just needs clean 3.3–5V logic power
-  (cheap combined boost+USB-C-charge modules exist for exactly this).
+  **Current leaning (2026-08-09, not finalized):** receiver + servo on a
+  **2S Li-ion pack** (7.4–8.4V) through a buck/BEC down to 5V for both the
+  servo and the board; handle on a **single 1S Li-ion cell** (3.7–4.2V)
+  through a boost module, since it has no servo and just needs clean
+  3.3–5V logic power (cheap combined boost+USB-C-charge modules exist for
+  exactly this). Cell **format** (cylindrical 18650 vs. pouch LiPo) is a
+  separate, still-open decision — see the battery cell format item below.
   Real open sub-questions, not yet resolved:
   - Whether the Nucleo-32 L432KC's 5V/VIN pins tolerate direct external
     injection when not USB-powered — needs checking against the datasheet,
@@ -205,6 +212,36 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   - **Runtime target: ≥2 hours of continuous servo operation** — a real
     sizing constraint for both pack capacity and servo current draw once
     the servo is picked.
+- [ ] **Battery cell format — cylindrical (18650) vs. pouch/soft-cell LiPo,
+  still open (2026-08-14).** Cell count/voltage leaning is unchanged (1S
+  handle, 2S receiver — see "Servo power architecture" above); the physical
+  cell format is a separate, unresolved blocker before packs can be sourced
+  or a battery compartment/mount designed for either unit.
+  - **Cylindrical 18650**, swapped as loose individual cells — hard can gives
+    better mechanical/thermal robustness than pouch, which matters more here
+    given the receiver's engine-adjacent, high-vibration mount (see the
+    vibration-dampener item above). Main risks: spring-contact reliability
+    under vibration (needs contact preload + secondary retention, not just
+    the spring), reverse-insertion risk (needs physical keying, not a
+    warning label alone), and no cell-level protection unless using
+    protected 18650s specifically.
+  - **Pouch LiPo, 2-lead (no balance tap), one pack per cell** — soldered
+    leads + a keyed connector (JST/XT) solve the contact-reliability and
+    reverse-polarity risks cleanly, but pouch cells are more puncture/crush-
+    sensitive and carry more thermal-runaway risk than a hard can, which
+    weighs heavier here than in a typical RC application given the
+    receiver's heat/vibration exposure near the engine. Would need
+    reputable-brand packs (real datasheet, trustworthy mAh rating — matters
+    for hitting the ≥2 hr runtime target) and likely a fireproof-bag storage/
+    charging practice in production if this is the format chosen.
+  - **Either format:** always charge each cell individually to full before
+    combining in series — this is what avoids needing a 2S balance charger/
+    tap at all, regardless of which format is picked. Packs/cells removable
+    and charged externally either way — no onboard charge circuitry planned
+    for either unit.
+  - **Decision deferred; actual battery choice may still change.** Don't
+    finalize the battery-compartment mechanical design or order production
+    cells until this is resolved.
 - [ ] **Receiver battery chemistry/voltage** — pick the receiver pack, then
   replace the placeholder mV values in `RX_BATT` and `read_battery_mv()`'s
   divider scaling with measured values. (Handle-side battery monitoring was
