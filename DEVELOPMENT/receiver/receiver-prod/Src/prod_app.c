@@ -46,6 +46,7 @@
 #include "tim.h"
 
 #include "led_blink.h"
+#include "unit_config.h"
 #include "nrf24.c"
 
 #define RECEIVER_PROD_BOARD
@@ -53,6 +54,11 @@
 
 /* --- Radio --- */
 static nrf24_handle_t g_radio;
+
+/* This board's per-unit nRF24 address (src/common/unit_config.h) - a
+ * static array so its lifetime outlives prod_app_init(), since
+ * nrf24_handle_t.addr only points to it rather than copying it. */
+static const uint8_t g_unit_addr[5] = { UNIT_NRF24_ADDR_PREFIX, UNIT_NUMBER };
 
 /* --- Ingestion: real nRF24L01+ payload -> the actual validation path.
  * Polled every call, no rate limit needed - a FIFO_STATUS check is a cheap
@@ -150,7 +156,12 @@ static void prod_status_led_tick(uint32_t now) {
         green = true;
     } else {
         uint16_t scale = g_batt_low ? 50u : 100u;
-        red = blink_pattern_tick(HEARTBEAT_PATTERN, HEARTBEAT_PATTERN_LEN, &g_prod_heartbeat_blink, now, scale);
+        bool beat = blink_pattern_tick(HEARTBEAT_PATTERN, HEARTBEAT_PATTERN_LEN, &g_prod_heartbeat_blink, now, scale);
+        /* Test builds (UNIT_NUMBER == 0xFF) invert the heartbeat: mostly ON
+         * with brief OFF blips, instead of mostly off with brief pulses -
+         * an unmistakable "this is not a real paired unit" visual on real
+         * hardware. See src/common/unit_config.h. */
+        red = UNIT_IS_TEST_BUILD ? !beat : beat;
     }
 
     HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, red ? GPIO_PIN_SET : GPIO_PIN_RESET);
@@ -172,6 +183,7 @@ void prod_app_init(void) {
     g_radio.ce_pin   = NRF_CE_Pin;
     g_radio.csn_port = NRF_CSN_GPIO_Port;
     g_radio.csn_pin  = NRF_CSN_Pin;
+    g_radio.addr     = g_unit_addr;
     nrf24_init(&g_radio);
     nrf24_enter_rx_mode(&g_radio);
 
