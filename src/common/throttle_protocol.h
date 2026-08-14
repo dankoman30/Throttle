@@ -84,6 +84,15 @@ typedef struct {
                                                 vibration doesn't make the servo hunt. Rails (0 and 255) always
                                                 update so full idle / full throttle stay exactly reachable. */
 
+#define TRIGGER_OVERSAMPLE_COUNT    8       /* raw ADC conversions averaged into a single throttle sample, taken
+                                                back-to-back well within one HANDLE_TX_PERIOD_MS window. The EMA
+                                                below only smooths what it's given - it can't undo aliasing that
+                                                already happened at the sampling instant, so this has to happen
+                                                before the EMA, not instead of it. Pair with an RC low-pass on the
+                                                physical ADC input (see docs/OPEN-ITEMS.md "Trigger-ADC anti-alias
+                                                + oversampling") - oversampling alone helps but doesn't replace an
+                                                analog filter for true anti-aliasing. */
+
 #define IDLE_THROTTLE_VALUE         0       /* 0-255 scale, define what "idle" means on your servo mapping */
 #define IDLE_THRESHOLD_FOR_START    15      /* throttle must be <= this value for a start request to be honored */
 
