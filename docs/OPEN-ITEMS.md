@@ -323,15 +323,37 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   min/max mapped to full-closed/full-open throttle — likely just a firmware
   constant change, not a CubeMX regeneration, unless the new servo uses a
   non-standard control protocol.
-- [ ] **Trigger-ADC anti-alias + oversampling.** The trigger is sampled at 80 Hz,
+- [~] **Trigger-ADC anti-alias + oversampling.** The trigger is sampled at 80 Hz,
   so hand/engine vibration above ~40 Hz **aliases** and no software filter can
-  remove it. Add (hardware) an **RC low-pass on the ADC input** as an anti-alias
-  filter, and (firmware) **oversample the ADC faster than 80 Hz and average**
-  before the EMA. The handle already has an EMA + a deadband/hysteresis
-  (`THROTTLE_DEADBAND`) and the receiver rate-limits the servo, but those sit
-  *after* sampling — they don't fix aliased noise. Tune the EMA `FILTER_SHIFT`
-  and `THROTTLE_DEADBAND` on real hardware. (Raised by instructor feedback on
-  servo-from-analog control: debounce, damping, hysteresis.)
+  remove it. Needs both a hardware and a firmware half - the EMA + deadband/
+  hysteresis (`THROTTLE_DEADBAND`) already in the handle and the receiver's
+  servo rate-limiter all sit *after* sampling, so none of them can fix
+  aliased noise; it has to be addressed at the sampling stage itself.
+  - **Firmware half done (2026-08-14):** `read_throttle_raw_oversampled()`
+    in `src/handle/handle_firmware.c` averages `TRIGGER_OVERSAMPLE_COUNT`
+    (8, `src/common/throttle_protocol.h`) back-to-back raw ADC conversions
+    into one sample before the EMA ever sees it. Helps on its own, but is
+    not a substitute for the hardware half below - oversampling alone
+    can't undo aliasing that already happened in the analog domain.
+  - **Hardware half still open:** an **RC low-pass on the ADC input**
+    (`PA5`/`TRIGGER_ADC` on `handle-prod`) as the actual anti-alias
+    filter. Target cutoff ~100Hz (comfortably above real trigger-input
+    bandwidth, comfortably below the Moster 185's ~120-130Hz fundamental
+    vibration frequency at max RPM) - starting values R=1kΩ/C=1.5µF.
+    Goes in series between the pot wiper and the pin, capacitor from that
+    same node to GND (coexists fine with the existing 100kΩ fail-safe
+    pull-down already there - see
+    `DEVELOPMENT/handle/handle-prod/docs/wiring.md` "Trigger"). **Must be
+    paired with a longer ADC sampling time** in
+    CubeMX for the trigger channel (currently `ADC_SAMPLETIME_2CYCLES_5`,
+    sized for ~zero source impedance) - the new series R needs a much
+    longer sample window for the ADC's sample-and-hold capacitor to
+    charge fully, or readings silently read low. Treat the RC filter and
+    the sampling-time change as one combined change, and verify a known
+    trigger position (e.g. full release ≈ 0) reads correctly afterward.
+  - Tune the EMA `FILTER_SHIFT` and `THROTTLE_DEADBAND` on real hardware
+    once the above is in place. (Raised by instructor feedback on
+    servo-from-analog control: debounce, damping, hysteresis.)
 - [ ] Generate the STM32CubeIDE projects (none committed yet).
 - [x] ~~Open question: does **kill** warrant a confirmed-delivery/ack path~~ —
   **resolved: no.** Kill's latch+resend already survives arbitrary packet

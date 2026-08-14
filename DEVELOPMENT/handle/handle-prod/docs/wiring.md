@@ -75,6 +75,18 @@ low-impedance source) of enough time to charge the sample capacitor.
 full rail-to-rail range; retune once the pot is wired and its actual travel
 is measured on the bench.
 
+**Anti-alias RC filter (not yet wired):** hand/engine vibration above the
+80Hz sample rate's Nyquist aliases and can't be fixed after the fact - see
+`docs/OPEN-ITEMS.md` "Trigger-ADC anti-alias + oversampling" for the full
+plan (target ~100Hz cutoff, R=1kΩ/C=1.5µF starting values, in series
+between the wiper and the pin with the cap shunting to GND at the same
+node as the pull-down above) and the **required matching change** to the
+trigger channel's ADC sampling time once it's added - the current very
+short `ADC_SAMPLETIME_2CYCLES_5` won't let the sample capacitor charge
+through the new series resistance. The firmware oversampling half
+(`TRIGGER_OVERSAMPLE_COUNT`) is already in place and doesn't need this to
+work, but the two together are what actually solves aliasing.
+
 ## Kill switch
 
 Fail-safe: **normally-closed**, pull-up already enabled in CubeMX, so open
