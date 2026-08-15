@@ -1,0 +1,1010 @@
+<title>Receiver-Prod Wiring</title>
+<style>
+  :root {
+    --bg: #E8E9E1;
+    --card: #F1F2EC;
+    --ink: #20241D;
+    --wire: #454C3F;
+    --muted-line: #9A9F8F;
+    --muted-text: #6B7060;
+    --accent: #A8551F;
+    --accent-text: #8A481C;
+    --rule: #C9CBBD;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14160F;
+      --card: #1B1D15;
+      --ink: #E9E7DC;
+      --wire: #ABAF9C;
+      --muted-line: #6E7364;
+      --muted-text: #9BA08D;
+      --accent: #E28A4C;
+      --accent-text: #E8965C;
+      --rule: #33362A;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14160F;
+    --card: #1B1D15;
+    --ink: #E9E7DC;
+    --wire: #ABAF9C;
+    --muted-line: #6E7364;
+    --muted-text: #9BA08D;
+    --accent: #E28A4C;
+    --accent-text: #E8965C;
+    --rule: #33362A;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 40px 20px 70px;
+  }
+  main {
+    width: 100%;
+    max-width: 980px;
+  }
+  .eyebrow {
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted-text);
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    margin: 0 0 6px;
+  }
+  h1 {
+    font-size: 28px;
+    line-height: 1.15;
+    margin: 0 0 8px;
+    text-wrap: balance;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+  }
+  .sub {
+    margin: 0 0 22px;
+    color: var(--muted-text);
+    font-size: 14.5px;
+    line-height: 1.55;
+    max-width: 74ch;
+  }
+
+  .legend {
+    display: flex;
+    gap: 22px;
+    margin: 0 0 30px;
+    padding: 14px 16px;
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    font-size: 12.5px;
+    color: var(--muted-text);
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 8px; }
+  .swatch { width: 20px; height: 3px; border-radius: 2px; flex: none; }
+  .swatch.wired { background: var(--wire); }
+  .swatch.gap { background: var(--accent); background-image: repeating-linear-gradient(90deg, var(--accent) 0 6px, transparent 6px 10px); background-color: transparent; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .dot.wired-dot { border: 2px solid var(--ink); background: transparent; }
+  .dot.gap-dot { border: 2px dashed var(--accent); background: transparent; }
+
+  section.group {
+    margin: 0 0 40px;
+  }
+  h2 {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.005em;
+    margin: 0 0 3px;
+  }
+  .h2-meta {
+    font-size: 12px;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    color: var(--muted-text);
+    margin: 0 0 14px;
+  }
+  .h2-meta .tag { margin-right: 6px; }
+
+  figure {
+    margin: 0 0 14px;
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 20px 18px 14px;
+  }
+  svg { display: block; width: 100%; height: auto; }
+  figcaption {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--rule);
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--muted-text);
+  }
+  figcaption strong { color: var(--ink); font-weight: 600; }
+
+  .prose {
+    font-size: 13.5px;
+    line-height: 1.65;
+    color: var(--muted-text);
+    max-width: 78ch;
+    margin: 0 0 14px;
+  }
+  .prose strong { color: var(--ink); font-weight: 600; }
+  .prose code {
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 12.5px;
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 1px 5px;
+  }
+
+  .callout {
+    display: flex;
+    gap: 12px;
+    background: color-mix(in srgb, var(--accent) 10%, var(--card));
+    border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--rule));
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--ink);
+    margin: 0 0 14px;
+  }
+  .callout b { color: var(--accent-text); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+  caption {
+    text-align: left;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted-text);
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    margin-bottom: 10px;
+  }
+  th {
+    text-align: left;
+    font-size: 11.5px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted-text);
+    font-weight: 600;
+    padding: 0 10px 8px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  td {
+    padding: 9px 10px 9px 0;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+  .mono {
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .tag.wired { background: color-mix(in srgb, var(--wire) 20%, transparent); color: var(--muted-text); }
+  .tag.gap { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent-text); }
+  .note { color: var(--muted-text); }
+  .overview-wrap { overflow-x: auto; }
+  .overview-wrap svg { min-width: 900px; }
+</style>
+
+<main>
+  <p class="eyebrow">receiver-prod &middot; engine unit</p>
+  <h1>Receiver-prod wiring</h1>
+  <p class="sub">
+    STM32L432KC Nucleo-32 (the second <span class="mono" style="font-size:0.94em">spi-bringup</span>
+    board, unmodified) driving the engine-mounted throttle receiver: radio, servo,
+    status/cruise/AUX indicators, and a local start button. 15 of 17 usable pins are
+    committed &mdash; 12 are live today, 3 are configured but <strong>not yet wired</strong>
+    pending open hardware questions. This diagram draws the actual state of the bench
+    unit, gaps included, not the finished design.
+  </p>
+
+  <div class="legend">
+    <span><i class="swatch wired"></i> wired &amp; live</span>
+    <span><i class="swatch gap"></i> planned &mdash; not yet wired</span>
+    <span><i class="dot wired-dot"></i> MCU pin, connected</span>
+    <span><i class="dot gap-dot"></i> MCU pin, floating (no load yet)</span>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- FIGURE 1 — OVERVIEW / PIN MAP -->
+  <!-- ============================================================ -->
+  <section class="group">
+    <h2>Pin map</h2>
+    <p class="h2-meta">STM32L432KC &middot; 15 of 17 GPIO used &middot; 4 function clusters + 3 known gaps</p>
+    <figure>
+      <div class="overview-wrap">
+      <svg viewBox="0 0 1340 1000" role="img" aria-label="The STM32L432KC MCU drawn as a central block with fifteen pins around its perimeter, grouped into four clusters: five radio SPI pins on top routing to an nRF24L01 module, five LED pins on the left for status, cruise, and AUX indicators, two pins on the bottom for the servo and local start button, and three pins on the right — kill relay, starter relay, and battery sense — drawn with dashed accent-colored lines and open terminals to show they are not yet wired to anything.">
+        <!-- MCU block -->
+        <rect x="390" y="460" width="520" height="280" rx="8" fill="none" stroke="var(--ink)" stroke-width="2"></rect>
+        <text x="650" y="580" text-anchor="middle" font-size="19" font-weight="700" fill="var(--ink)" font-family="ui-monospace, Consolas, monospace">STM32L432KC</text>
+        <text x="650" y="604" text-anchor="middle" font-size="12" fill="var(--muted-text)" font-family="ui-monospace, Consolas, monospace">Nucleo-32 &middot; board B (spi-bringup)</text>
+        <text x="650" y="624" text-anchor="middle" font-size="10.5" fill="var(--muted-text)" font-family="ui-monospace, Consolas, monospace">SB16 / SB18 bridges intact &mdash; unmodified</text>
+        <text x="650" y="642" text-anchor="middle" font-size="10.5" fill="var(--muted-text)" font-family="ui-monospace, Consolas, monospace">15 of 17 GPIO committed, 2 spare</text>
+        <text x="650" y="660" text-anchor="middle" font-size="10.5" fill="var(--muted-text)" font-family="ui-monospace, Consolas, monospace">engine-mounted receiver</text>
+
+        <!-- ===== TOP: radio SPI (5) ===== -->
+        <text x="650" y="208" text-anchor="middle" font-size="14" font-weight="700" letter-spacing="0.04em" fill="var(--ink)" font-family="ui-monospace, Consolas, monospace">RADIO SPI BUS</text>
+        <text x="650" y="226" text-anchor="middle" font-size="10.5" fill="var(--muted-text)" font-family="ui-monospace, Consolas, monospace">nRF24L01+PA+LNA &mdash; reused unchanged from spi-bringup</text>
+
+        <g stroke="var(--wire)" stroke-width="2" fill="none">
+          <line x1="460" y1="460" x2="460" y2="300"></line>
+          <line x1="555" y1="460" x2="555" y2="300"></line>
+          <line x1="650" y1="460" x2="650" y2="300"></line>
+          <line x1="745" y1="460" x2="745" y2="300"></line>
+          <line x1="840" y1="460" x2="840" y2="300"></line>
+        </g>
+        <g fill="none" stroke="var(--ink)" stroke-width="2">
+          <circle cx="460" cy="300" r="5"></circle>
+          <circle cx="555" cy="300" r="5"></circle>
+          <circle cx="650" cy="300" r="5"></circle>
+          <circle cx="745" cy="300" r="5"></circle>
+          <circle cx="840" cy="300" r="5"></circle>
+        </g>
+        <g text-anchor="middle" font-family="ui-monospace, Consolas, monospace" fill="var(--ink)">
+          <text x="460" y="286" font-size="11" font-weight="700">A1 (PA1)</text>
+          <text x="460" y="270" font-size="10" fill="var(--muted-text)">NRF_CE</text>
+          <text x="555" y="286" font-size="11" font-weight="700">A2 (PA3)</text>
+          <text x="555" y="270" font-size="10" fill="var(--muted-text)">NRF_CSN</text>
+          <text x="650" y="286" font-size="11" font-weight="700">D13 (PB3)</text>
+          <text x="650" y="270" font-size="10" fill="var(--muted-text)">SPI1_SCK</text>
+          <text x="650" y="256" font-size="8.5" fill="var(--muted-text)">LD3 flickers w/ clock</text>
+          <text x="745" y="286" font-size="11" font-weight="700">D12 (PB4)</text>
+          <text x="745" y="270" font-size="10" fill="var(--muted-text)">SPI1_MISO</text>
+          <text x="840" y="286" font-size="11" font-weight="700">D11 (PB5)</text>
+          <text x="840" y="270" font-size="10" fill="var(--muted-text)">SPI1_MOSI</text>
+        </g>
+
+        <!-- ===== LEFT: status/cruise/AUX LEDs (5) ===== -->
+        <text x="110" y="442" text-anchor="middle" font-size="13.5" font-weight="700" letter-spacing="0.02em" fill="var(--ink)" font-family="ui-monospace, Consolas, monospace">STATUS / CRUISE</text>
+        <text x="110" y="458" text-anchor="middle" font-size="13.5" font-weight="700" letter-spacing="0.02em" fill="var(--ink)" font-family="ui-monospace, Consolas, monospace">/ AUX LEDS</text>
+
+        <g stroke="var(--wire)" stroke-width="2" fill="none">
+          <line x1="390" y1="488" x2="220" y2="488"></line>
+          <line x1="390" y1="544" x2="220" y2="544"></line>
+          <line x1="390" y1="600" x2="220" y2="600"></line>
+          <line x1="390" y1="656" x2="220" y2="656"></line>
+          <line x1="390" y1="712" x2="220" y2="712"></line>
+        </g>
+        <g fill="none" stroke="var(--ink)" stroke-width="2">
+          <circle cx="220" cy="488" r="5"></circle>
+          <circle cx="220" cy="544" r="5"></circle>
+          <circle cx="220" cy="600" r="5"></circle>
+          <circle cx="220" cy="656" r="5"></circle>
+          <circle cx="220" cy="712" r="5"></circle>
+        </g>
+        <g text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="var(--ink)">
+          <text x="205" y="484" font-size="11" font-weight="700">A6 (PA7)</text>
+          <text x="205" y="499" font-size="10" fill="var(--muted-text)">LED_RED &middot; status</text>
+          <text x="205" y="540" font-size="11" font-weight="700">D9 (PA8)</text>
+          <text x="205" y="555" font-size="10" fill="var(--muted-text)">LED_GREEN &middot; status</text>
+          <text x="205" y="596" font-size="11" font-weight="700">D10 (PA11)</text>
+          <text x="205" y="611" font-size="10" fill="var(--muted-text)">CRUISE_LED</text>
+          <text x="205" y="652" font-size="11" font-weight="700">D1/TX (PA9)</text>
+          <text x="205" y="667" font-size="10" fill="var(--muted-text)">AUX1_OUT</text>
+          <text x="205" y="708" font-size="11" font-weight="700">D0/RX (PA10)</text>
+          <text x="205" y="723" font-size="10" fill="var(--muted-text)">AUX2_OUT</text>
+        </g>
+
+        <!-- ===== RIGHT: known gaps (3) ===== -->
+        <text x="1210" y="442" text-anchor="middle" font-size="13.5" font-weight="700" letter-spacing="0.02em" fill="var(--accent-text)" font-family="ui-monospace, Consolas, monospace">KNOWN GAPS</text>
+        <text x="1210" y="458" text-anchor="middle" font-size="10.5" fill="var(--accent-text)" font-family="ui-monospace, Consolas, monospace">planned &mdash; not yet wired</text>
+
+        <g stroke="var(--accent)" stroke-width="2" fill="none" stroke-dasharray="7 5">
+          <line x1="910" y1="510" x2="1080" y2="510"></line>
+          <line x1="910" y1="600" x2="1080" y2="600"></line>
+          <line x1="910" y1="690" x2="1080" y2="690"></line>
+        </g>
+        <g fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="3 3">
+          <circle cx="1080" cy="510" r="5"></circle>
+          <circle cx="1080" cy="600" r="5"></circle>
+          <circle cx="1080" cy="690" r="5"></circle>
+        </g>
+        <g text-anchor="start" font-family="ui-monospace, Consolas, monospace">
+          <text x="1092" y="502" font-size="11" font-weight="700" fill="var(--accent-text)">A3 (PA4)</text>
+          <text x="1092" y="517" font-size="10" fill="var(--muted-text)">KILL_RELAY</text>
+          <text x="1092" y="531" font-size="9.5" font-weight="700" fill="var(--accent-text)">&mdash; not wired</text>
+
+          <text x="1092" y="592" font-size="11" font-weight="700" fill="var(--accent-text)">D6 (PB1)</text>
+          <text x="1092" y="607" font-size="10" fill="var(--muted-text)">STARTER_RELAY</text>
+          <text x="1092" y="621" font-size="9.5" font-weight="700" fill="var(--accent-text)">&mdash; not wired</text>
+
+          <text x="1092" y="682" font-size="11" font-weight="700" fill="var(--accent-text)">A5 (PA6)</text>
+          <text x="1092" y="697" font-size="10" fill="var(--muted-text)">BATT_SENSE / ADC1_IN11</text>
+          <text x="1092" y="711" font-size="9.5" font-weight="700" fill="var(--accent-text)">&mdash; not wired</text>
+        </g>
+
+        <!-- ===== BOTTOM: servo + local start button (2) ===== -->
+        <g stroke="var(--wire)" stroke-width="2" fill="none">
+          <line x1="530" y1="740" x2="530" y2="860"></line>
+          <line x1="770" y1="740" x2="770" y2="860"></line>
+        </g>
+        <g fill="none" stroke="var(--ink)" stroke-width="2">
+          <circle cx="530" cy="860" r="5"></circle>
+          <circle cx="770" cy="860" r="5"></circle>
+        </g>
+        <g text-anchor="middle" font-family="ui-monospace, Consolas, monospace" fill="var(--ink)">
+          <text x="530" y="880" font-size="11" font-weight="700">A4 (PA5)</text>
+          <text x="530" y="896" font-size="10" fill="var(--muted-text)">TIM2_CH1 &middot; servo PWM</text>
+          <text x="530" y="924" font-size="13" font-weight="700">SERVO PWM</text>
+          <text x="530" y="940" font-size="10" fill="var(--muted-text)">50Hz, SG90 placeholder</text>
+
+          <text x="770" y="880" font-size="11" font-weight="700">D3 (PB0)</text>
+          <text x="770" y="896" font-size="10" fill="var(--muted-text)">LOCAL_START_BTN</text>
+          <text x="770" y="924" font-size="13" font-weight="700">LOCAL START BUTTON</text>
+          <text x="770" y="940" font-size="10" fill="var(--muted-text)">ground-crew override</text>
+        </g>
+      </svg>
+      </div>
+      <figcaption>
+        Four live clusters &mdash; <strong>radio SPI</strong> (top), <strong>status /
+        cruise / AUX LEDs</strong> (left), <strong>servo + local start button</strong>
+        (bottom) &mdash; are wired and working. The three pins on the right &mdash;
+        <strong>kill relay, starter relay, battery sense</strong> &mdash; are configured
+        in CubeMX and referenced in firmware but sit unconnected on the bench today;
+        each is detailed further down with why. Detailed per-cluster wiring follows below.
+      </figcaption>
+    </figure>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- FIGURE 2 — RADIO SPI BUS -->
+  <!-- ============================================================ -->
+  <section class="group">
+    <h2>Radio &mdash; nRF24L01+PA+LNA</h2>
+    <p class="h2-meta"><span class="tag wired">wired</span>CE &middot; CSN &middot; SCK &middot; MISO &middot; MOSI</p>
+    <figure>
+      <svg viewBox="0 0 900 580" role="img" aria-label="Schematic of five SPI lines running from MCU pins CE, CSN, SCK, MISO, and MOSI to the nRF24L01 module, with the module's power pin decoupled to ground through a 0.1 microfarad ceramic capacitor and a 10 to 100 microfarad electrolytic capacitor in parallel, both fed from the 3.3 volt rail.">
+        <!-- rails -->
+        <g stroke="var(--wire)" stroke-width="2">
+          <line x1="60" y1="50" x2="860" y2="50"></line>
+          <line x1="60" y1="520" x2="860" y2="520"></line>
+        </g>
+        <text x="46" y="54" text-anchor="end" font-size="14" font-weight="700" fill="var(--ink)" font-family="ui-monospace, Consolas, monospace">3V3</text>
+        <g stroke="var(--ink)" stroke-width="2">
+          <line x1="60" y1="520" x2="60" y2="532"></line>
+          <line x1="48" y1="532" x2="72" y2="532"></line>
+          <line x1="52" y1="538" x2="68" y2="538"></line>
+          <line x1="56" y1="544" x2="64" y2="544"></line>
+        </g>
+        <text x="46" y="562" font-size="13" font-weight="700" fill="var(--ink)" font-family="ui-monospace, Consolas, monospace">GND</text>
+
+        <!-- module box -->
+        <rect x="620" y="160" width="210" height="240" rx="6" fill="none" stroke="var(--ink)" stroke-width="2"></rect>
+        <text x="725" y="266" text-anchor="middle" font-size="14" font-weight="700" fill="var(--ink)" font-family="ui-monospace, Consolas, monospace">nRF24L01+</text>
+        <text x="725" y="286" text-anchor="middle" font-size="11" fill="var(--muted-text)" font-family="ui-monospace, Consolas, monospace">PA+LNA module</text>
+        <text x="725" y="304" text-anchor="middle" font-size="9.5" fill="var(--muted-text)" font-family="ui-monospace, Consolas, monospace">reused &mdash; spi-bringup</text>
+
+        <!-- power: node -> module V+, branch to two decoupling caps -->
+        <g stroke="var(--wire)" stroke-width="2" fill="none">
+          <line x1="725" y1="50" x2="725" y2="90"></line>
+          <line x1="725" y1="90" x2="725" y2="160"></line>
+          <line x1="460" y1="90" x2="725" y2="90"></line>
+          <line x1="460" y1="90" x2="460" y2="205"></line>
+          <line x1="540" y1="90" x2="540" y2="205"></line>
+          <line x1="460" y1="230" x2="460" y2="520"></line>
+          <line x1="540" y1="230" x2="540" y2="520"></line>
+        </g>
+        <circle cx="725" cy="90" r="5" fill="var(--ink)"></circle>
+
+        <!-- C ceramic 0.1uF -->
+        <g stroke="var(--muted-line)" stroke-width="3">
+          <line x1="442" y1="205" x2="478" y2="205"></line>
+          <line x1="442" y1="221" x2="478" y2="221"></line>
+        </g>
+        <text x="460" y="248" text-anchor="middle" font-size="12" font-weight="700" fill="var(--muted-text)" font-family="ui-monospace, Consolas, monospace">0.1&micro;F</text>
+        <text x="460" y="262" text-anchor="middle" font-size="9.5" fill="var(--muted-text)" font-family="ui-monospace, Consolas, monospace">ceramic</text>
+
+        <!-- C electrolytic 10-100uF with polarity -->
+        <g stroke="var(--muted-line)" stroke-width="3">
+          <line x1="522" y1="205" x2="558" y2="205"></line>
+          <line x1="522" y1="221" x2="558" y2="221"></line>
+        </g>
+        <text x="518" y="200" text-anchor="end" font-size="14" font-weight="800" fill="var(--muted-text)">+</text>
+        <text x="540" y="248" text-anchor="middle" font-size="12" font-weight="700" fill="var(--muted-text)" font-family="ui-monospace, Consolas, monospace">10&ndash;100&micro;F</text>
+        <text x="540" y="262" text-anchor="middle" font-size="9.5" fill="var(--muted-text)" font-family="ui-monospace, Consolas, monospace">electrolytic</text>
+
+        <!-- module GND pin -->
+        <g stroke="var(--wire)" stroke-width="2">
+          <line x1="725" y1="400" x2="725" y2="520"></line>
+        </g>
+        <text x="742" y="380" font-size="9.5" fill="var(--muted-text)" font-family="ui-monospace, Consolas, monospace">V+</text>
+        <text x="742" y="416" font-size="9.5" fill="var(--muted-text)" font-family="ui-monospace, Consolas, monospace">GND</text>
+
+        <!-- 5 SPI lines: MCU stubs at x=160, module pins at x=620 -->
+        <g fill="none" stroke="var(--ink)" stroke-width="2">
+          <circle cx="160" cy="190" r="5"></circle>
+          <circle cx="160" cy="225" r="5"></circle>
+          <circle cx="160" cy="260" r="5"></circle>
+          <circle cx="160" cy="295" r="5"></circle>
+          <circle cx="160" cy="330" r="5"></circle>
+        </g>
+        <g stroke="var(--wire)" stroke-width="2">
+          <line x1="160" y1="190" x2="620" y2="190"></line>
+          <line x1="160" y1="225" x2="620" y2="225"></line>
+          <line x1="160" y1="260" x2="620" y2="260"></line>
+          <line x1="160" y1="295" x2="620" y2="295"></line>
+          <line x1="160" y1="330" x2="620" y2="330"></line>
+        </g>
+        <!-- direction arrows: right for CE/CSN/SCK/MOSI, left for MISO -->
+        <g fill="var(--accent)" stroke="none">
+          <polygon points="390,185 404,190 390,195"></polygon>
+          <polygon points="390,220 404,225 390,230"></polygon>
+          <polygon points="390,255 404,260 390,265"></polygon>
+          <polygon points="404,290 390,295 404,300"></polygon>
+          <polygon points="390,325 404,330 390,335"></polygon>
+        </g>
+
+        <g text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="var(--ink)">
+          <text x="145" y="176" font-size="11" font-weight="700">A1 (PA1)</text>
+          <text x="145" y="163" font-size="9.5" fill="var(--muted-text)">NRF_CE</text>
+          <text x="145" y="211" font-size="11" font-weight="700">A2 (PA3)</text>
+          <text x="145" y="198" font-size="9.5" fill="var(--muted-text)">NRF_CSN</text>
+          <text x="145" y="246" font-size="11" font-weight="700">D13 (PB3)</text>
+          <text x="145" y="233" font-size="9.5" fill="var(--muted-text)">SPI1_SCK</text>
+          <text x="145" y="281" font-size="11" font-weight="700">D12 (PB4)</text>
+          <text x="145" y="268" font-size="9.5" fill="var(--muted-text)">SPI1_MISO (in)</text>
+          <text x="145" y="316" font-size="11" font-weight="700">D11 (PB5)</text>
+          <text x="145" y="303" font-size="9.5" fill="var(--muted-text)">SPI1_MOSI</text>
+        </g>
+        <g text-anchor="start" font-family="ui-monospace, Consolas, monospace" fill="var(--muted-text)" font-size="10.5">
+          <text x="632" y="186">CE</text>
+          <text x="632" y="221">CSN</text>
+          <text x="632" y="256">SCK</text>
+          <text x="632" y="291">MISO</text>
+          <text x="632" y="326">MOSI</text>
+        </g>
+      </svg>
+      <figcaption>
+        <strong>Reused unchanged</strong> from <code>DEVELOPMENT/radio/spi-bringup/</code>
+        &mdash; same module, same wiring, same decoupling. Don't rewire this; it's the
+        exact bring-up setup that already proved a working two-board link. SCK doubles
+        onto onboard LD3 (harmless flicker). Arrowheads show data direction &mdash; MISO
+        is the one line running back into the MCU.
+      </figcaption>
+    </figure>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- FIGURE 3 — STATUS LED -->
+  <!-- ============================================================ -->
+  <section class="group">
+    <h2>Status LED &mdash; bi-color (red + green)</h2>
+    <p class="h2-meta"><span class="tag wired">wired</span>common cathode &middot; tri-color package, blue lead now unused</p>
+    <figure>
+      <svg viewBox="0 0 820 660" role="img" aria-label="Diagram of a four-lead LED package in physical order blue, green, common, red, with the common lead drawn longer than the others and marked as the second lead from the blue end. Below it, a schematic shows PA7 driving red through a 220 ohm resistor and PA8 driving green through a 220 ohm resistor, both LED cathodes tied together at a common node running to ground. The blue lead is drawn dashed and marked disconnected.">
+        <!-- physical package -->
+        <rect x="90" y="24" width="400" height="50" rx="6" fill="none" stroke="var(--muted-line)" stroke-width="1.5"></rect>
+        <text x="290" y="18" text-anchor="middle" font-size="10.5" fill="var(--muted-text)" font-family="ui-monospace, Consolas, monospace">tri-color package body &mdash; blue lead now unused</text>
+
+        <g stroke="var(--accent)" stroke-width="2" stroke-dasharray="5 4">
+          <line x1="140" y1="60" x2="140" y2="140"></line>
+        </g>
+        <g stroke="var(--wire)" stroke-width="2">
+          <line x1="240" y1="60" x2="240" y2="140"></line>
+          <line x1="440" y1="60" x2="440" y2="140"></line>
+        </g>
+        <g stroke="var(--ink)" stroke-width="2.5">
+          <line x1="340" y1="60" x2="340" y2="170"></line>
+        </g>
+
+        <g text-anchor="middle" font-family="ui-monospace, Consolas, monospace">
+          <text x="140" y="158" font-size="11" font-weight="700" fill="var(--accent-text)">BLUE</text>
+          <text x="140" y="172" font-size="9.5" fill="var(--accent-text)">disconnected</text>
+          <text x="240" y="158" font-size="11" font-weight="700" fill="var(--ink)">GREEN</text>
+          <text x="340" y="188" font-size="11" font-weight="700" fill="var(--ink)">COMMON</text>
+          <text x="340" y="202" font-size="9.5" fill="var(--muted-text)">longest lead</text>
+          <text x="440" y="158" font-size="11" font-weight="700" fill="var(--ink)">RED</text>
+        </g>
+        <text x="340" y="228" text-anchor="middle" font-size="10.5" fill="var(--muted-text)" font-family="ui-monospace, Consolas, monospace">2nd lead from the blue end &mdash; check LEAD LENGTH, not</text>
+        <text x="340" y="243" text-anchor="middle" font-size="10.5" fill="var(--muted-text)" font-family="ui-monospace, Consolas, monospace">position, before wiring. Easy to miscount by one.</text>
+
+        <!-- circuit -->
+        <g fill="none" stroke="var(--ink)" stroke-width="2">
+          <circle cx="140" cy="340" r="5"></circle>
+          <circle cx="140" cy="440" r="5"></circle>
+        </g>
+        <g text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="var(--ink)">
+          <text x="125" y="326" font-size="11" font-weight="700">A6 (PA7)</text>
+          <text x="125" y="341" font-size="10" fill="var(--muted-text)">LED_RED</text>
+          <text x="125" y="426" font-size="11" font-weight="700">D9 (PA8)</text>
+          <text x="125" y="441" font-size="10" fill="var(--muted-text)">LED_GREEN</text>
+        </g>
+
+        <!-- resistors -->
+        <g stroke="var(--wire)" stroke-width="2" fill="none">
+          <line x1="140" y1="340" x2="200" y2="340"></line>
+          <rect x="200" y="325" width="70" height="30" rx="4"></rect>
+          <line x1="270" y1="340" x2="330" y2="340"></line>
+
+          <line x1="140" y1="440" x2="200" y2="440"></line>
+          <rect x="200" y="425" width="70" height="30" rx="4"></rect>
+          <line x1="270" y1="440" x2="330" y2="440"></line>
+        </g>
+        <text x="235" y="318" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ink)" font-family="ui-monospace, Consolas, monospace">220&#0937;</text>
+        <text x="235" y="418" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ink)" font-family="ui-monospace, Consolas, monospace">220&#0937;</text>
+
+        <!-- LED symbols (diode triangle + bar, pointing right = anode->cathode) -->
+        <g fill="var(--ink)" stroke="var(--ink)" stroke-width="2">
+          <polygon points="330,325 330,355 362,340" fill="none"></polygon>
+          <line x1="362" y1="325" x2="362" y2="355"></line>
+        </g>
+        <g fill="var(--ink)" stroke="var(--ink)" stroke-width="2">
+          <polygon points="330,425 330,455 362,440" fill="none"></polygon>
+          <line x1="362" y1="425" x2="362" y2="455"></line>
+        </g>
+        <g stroke="var(--ink)" stroke-width="1.5">
+          <line x1="368" y1="322" x2="380" y2="310"></line>
+          <line x1="374" y1="330" x2="386" y2="318"></line>
+          <line x1="368" y1="422" x2="380" y2="410"></line>
+          <line x1="374" y1="430" x2="386" y2="418"></line>
+        </g>
+        <text x="346" y="378" text-anchor="middle" font-size="10.5" fill="var(--muted-text)" font-family="ui-monospace, Consolas, monospace">red</text>
+        <text x="346" y="478" text-anchor="middle" font-size="10.5" fill="var(--muted-text)" font-family="ui-monospace, Consolas, monospace">green</text>
+
+        <!-- common cathode bus -->
+        <g stroke="var(--wire)" stroke-width="2" fill="none">
+          <line x1="362" y1="340" x2="460" y2="340"></line>
+          <line x1="362" y1="440" x2="460" y2="440"></line>
+          <line x1="460" y1="340" x2="460" y2="440"></line>
+          <line x1="460" y1="440" x2="460" y2="580"></line>
+        </g>
+        <circle cx="460" cy="340" r="5" fill="var(--ink)"></circle>
+        <circle cx="460" cy="440" r="5" fill="var(--ink)"></circle>
+
+        <g stroke="var(--ink)" stroke-width="2">
+          <line x1="460" y1="580" x2="460" y2="592"></line>
+          <line x1="448" y1="592" x2="472" y2="592"></line>
+          <line x1="452" y1="598" x2="468" y2="598"></line>
+          <line x1="456" y1="604" x2="464" y2="604"></line>
+        </g>
+        <text x="480" y="596" font-size="12" font-weight="700" fill="var(--ink)" font-family="ui-monospace, Consolas, monospace">GND</text>
+        <text x="480" y="612" font-size="10" fill="var(--muted-text)" font-family="ui-monospace, Consolas, monospace">common cathode</text>
+      </svg>
+      <figcaption>
+        <strong>Confirmed common cathode</strong> on this exact package: common (longest
+        lead) to GND, red through 220&#0937; lit red when briefly tied to 3.3V &mdash;
+        that was a one-time bench check, not the running circuit. In operation
+        <strong>PA7</strong> and <strong>PA8</strong> each drive their color through the
+        same 220&#0937; resistors; green typically reads dimmer than red at this value
+        (higher forward voltage) &mdash; fine for now, worth tuning later. The blue lead
+        is physically <strong>disconnected</strong>, freed for the standalone cruise LED below.
+      </figcaption>
+    </figure>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- FIGURE 4 — CRUISE / AUX1 / AUX2 -->
+  <!-- ============================================================ -->
+  <section class="group">
+    <h2>Cruise &amp; AUX indicator LEDs</h2>
+    <p class="h2-meta"><span class="tag wired">wired</span>three identical single-LED circuits, placeholder indicators</p>
+    <figure>
+      <svg viewBox="0 0 900 420" role="img" aria-label="Three identical vertical circuits side by side, each running from an MCU pin down through a 220 to 330 ohm resistor into an LED and to ground: cruise on PA11, AUX1 on PA9, and AUX2 on PA10.">
+        <!-- shared column template drawn 3x at x=170,450,730 -->
+        <g font-family="ui-monospace, Consolas, monospace">
+
+          <!-- column 1: cruise -->
+          <g>
+            <circle cx="170" cy="90" r="5" fill="none" stroke="var(--ink)" stroke-width="2"></circle>
+            <line x1="170" y1="90" x2="170" y2="130" stroke="var(--wire)" stroke-width="2"></line>
+            <rect x="140" y="130" width="60" height="70" rx="4" fill="none" stroke="var(--wire)" stroke-width="2"></rect>
+            <text x="215" y="170" font-size="12" font-weight="700" fill="var(--ink)">220&ndash;330&#0937;</text>
+            <line x1="170" y1="200" x2="170" y2="240" stroke="var(--wire)" stroke-width="2"></line>
+            <polygon points="150,240 150,270 182,255" fill="none" stroke="var(--ink)" stroke-width="2"></polygon>
+            <line x1="182" y1="240" x2="182" y2="270" stroke="var(--ink)" stroke-width="2"></line>
+            <line x1="188" y1="237" x2="200" y2="225" stroke="var(--ink)" stroke-width="1.5"></line>
+            <line x1="194" y1="245" x2="206" y2="233" stroke="var(--ink)" stroke-width="1.5"></line>
+            <text x="215" y="260" font-size="10.5" fill="var(--muted-text)">blue LED</text>
+            <line x1="170" y1="270" x2="170" y2="330" stroke="var(--wire)" stroke-width="2"></line>
+            <g stroke="var(--ink)" stroke-width="2">
+              <line x1="170" y1="330" x2="170" y2="342"></line>
+              <line x1="158" y1="342" x2="182" y2="342"></line>
+              <line x1="162" y1="348" x2="178" y2="348"></line>
+              <line x1="166" y1="354" x2="174" y2="354"></line>
+            </g>
+            <text x="170" y="80" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink)">D10 (PA11)</text>
+            <text x="170" y="66" text-anchor="middle" font-size="10" fill="var(--muted-text)">CRUISE_LED</text>
+            <text x="170" y="380" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ink)">cruise</text>
+            <text x="170" y="396" text-anchor="middle" font-size="9.5" fill="var(--muted-text)">lit while g_cruise_active</text>
+          </g>
+
+          <!-- column 2: AUX1 -->
+          <g>
+            <circle cx="450" cy="90" r="5" fill="none" stroke="var(--ink)" stroke-width="2"></circle>
+            <line x1="450" y1="90" x2="450" y2="130" stroke="var(--wire)" stroke-width="2"></line>
+            <rect x="420" y="130" width="60" height="70" rx="4" fill="none" stroke="var(--wire)" stroke-width="2"></rect>
+            <text x="495" y="170" font-size="12" font-weight="700" fill="var(--ink)">220&ndash;330&#0937;</text>
+            <line x1="450" y1="200" x2="450" y2="240" stroke="var(--wire)" stroke-width="2"></line>
+            <polygon points="430,240 430,270 462,255" fill="none" stroke="var(--ink)" stroke-width="2"></polygon>
+            <line x1="462" y1="240" x2="462" y2="270" stroke="var(--ink)" stroke-width="2"></line>
+            <line x1="468" y1="237" x2="480" y2="225" stroke="var(--ink)" stroke-width="1.5"></line>
+            <line x1="474" y1="245" x2="486" y2="233" stroke="var(--ink)" stroke-width="1.5"></line>
+            <text x="495" y="260" font-size="10.5" fill="var(--muted-text)">indicator LED</text>
+            <line x1="450" y1="270" x2="450" y2="330" stroke="var(--wire)" stroke-width="2"></line>
+            <g stroke="var(--ink)" stroke-width="2">
+              <line x1="450" y1="330" x2="450" y2="342"></line>
+              <line x1="438" y1="342" x2="462" y2="342"></line>
+              <line x1="442" y1="348" x2="458" y2="348"></line>
+              <line x1="446" y1="354" x2="454" y2="354"></line>
+            </g>
+            <text x="450" y="80" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink)">D1/TX (PA9)</text>
+            <text x="450" y="66" text-anchor="middle" font-size="10" fill="var(--muted-text)">AUX1_OUT</text>
+            <text x="450" y="380" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ink)">AUX1</text>
+            <text x="450" y="396" text-anchor="middle" font-size="9.5" fill="var(--muted-text)">handle latches this one</text>
+          </g>
+
+          <!-- column 3: AUX2 -->
+          <g>
+            <circle cx="730" cy="90" r="5" fill="none" stroke="var(--ink)" stroke-width="2"></circle>
+            <line x1="730" y1="90" x2="730" y2="130" stroke="var(--wire)" stroke-width="2"></line>
+            <rect x="700" y="130" width="60" height="70" rx="4" fill="none" stroke="var(--wire)" stroke-width="2"></rect>
+            <text x="775" y="170" font-size="12" font-weight="700" fill="var(--ink)">220&ndash;330&#0937;</text>
+            <line x1="730" y1="200" x2="730" y2="240" stroke="var(--wire)" stroke-width="2"></line>
+            <polygon points="710,240 710,270 742,255" fill="none" stroke="var(--ink)" stroke-width="2"></polygon>
+            <line x1="742" y1="240" x2="742" y2="270" stroke="var(--ink)" stroke-width="2"></line>
+            <line x1="748" y1="237" x2="760" y2="225" stroke="var(--ink)" stroke-width="1.5"></line>
+            <line x1="754" y1="245" x2="766" y2="233" stroke="var(--ink)" stroke-width="1.5"></line>
+            <text x="775" y="260" font-size="10.5" fill="var(--muted-text)">indicator LED</text>
+            <line x1="730" y1="270" x2="730" y2="330" stroke="var(--wire)" stroke-width="2"></line>
+            <g stroke="var(--ink)" stroke-width="2">
+              <line x1="730" y1="330" x2="730" y2="342"></line>
+              <line x1="718" y1="342" x2="742" y2="342"></line>
+              <line x1="722" y1="348" x2="738" y2="348"></line>
+              <line x1="726" y1="354" x2="734" y2="354"></line>
+            </g>
+            <text x="730" y="80" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink)">D0/RX (PA10)</text>
+            <text x="730" y="66" text-anchor="middle" font-size="10" fill="var(--muted-text)">AUX2_OUT</text>
+            <text x="730" y="380" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ink)">AUX2</text>
+            <text x="730" y="396" text-anchor="middle" font-size="9.5" fill="var(--muted-text)">momentary, no latch</text>
+          </g>
+        </g>
+      </svg>
+      <figcaption>
+        Same topology three times: pin &rarr; 220&ndash;330&#0937; &rarr; LED &rarr; GND.
+        All three are <strong>placeholder indicator LEDs</strong> standing in for future
+        relay-driven loads (AUX1 &rarr; strobe light, AUX2 &rarr; smoke). Confirmed working
+        on real hardware 2026-08-09, correctly tracking the handle's commanded state over
+        the radio link. AUX2 was briefly removed 2026-08-08 to save a pin on the handle
+        board and restored 2026-08-09 &mdash; never actually unassigned here, so no CubeMX
+        changes were needed on this side. The cruise LED is new: relabeled from the old
+        tri-color package's blue lead onto its own standalone LED on PA11.
+      </figcaption>
+    </figure>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- FIGURE 5 — SERVO -->
+  <!-- ============================================================ -->
+  <section class="group">
+    <h2>Servo &mdash; throttle actuator</h2>
+    <p class="h2-meta"><span class="tag wired">wired</span>SG90 placeholder &middot; TIM2_CH1 @ 50Hz</p>
+    <figure>
+      <svg viewBox="0 0 820 480" role="img" aria-label="Schematic of a three-wire SG90 servo: brown wire to ground, red wire to the 5 volt rail rather than 3.3 volts, and orange signal wire to PA5 driven as a 50 hertz PWM channel.">
+        <g stroke="var(--wire)" stroke-width="2">
+          <line x1="60" y1="60" x2="760" y2="60"></line>
+          <line x1="60" y1="420" x2="760" y2="420"></line>
+        </g>
+        <text x="46" y="64" text-anchor="end" font-size="14" font-weight="700" fill="var(--ink)" font-family="ui-monospace, Consolas, monospace">5V</text>
+        <text x="46" y="80" text-anchor="end" font-size="9.5" fill="var(--muted-text)" font-family="ui-monospace, Consolas, monospace">USB via ST-Link</text>
+        <g stroke="var(--ink)" stroke-width="2">
+          <line x1="60" y1="420" x2="60" y2="432"></line>
+          <line x1="48" y1="432" x2="72" y2="432"></line>
+          <line x1="52" y1="438" x2="68" y2="438"></line>
+          <line x1="56" y1="444" x2="64" y2="444"></line>
+        </g>
+        <text x="46" y="464" font-size="13" font-weight="700" fill="var(--ink)" font-family="ui-monospace, Consolas, monospace">GND</text>
+
+        <!-- callout: not 3V3 -->
+        <rect x="150" y="30" width="330" height="34" rx="6" fill="none" stroke="var(--muted-line)" stroke-width="1.5"></rect>
+        <text x="315" y="52" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--ink)" font-family="ui-monospace, Consolas, monospace">NOT 3V3 &mdash; servo draw exceeds that rail</text>
+
+        <!-- PA5 pin -->
+        <circle cx="140" cy="300" r="5" fill="none" stroke="var(--ink)" stroke-width="2"></circle>
+        <text x="125" y="286" text-anchor="end" font-size="11" font-weight="700" fill="var(--ink)" font-family="ui-monospace, Consolas, monospace">A4 (PA5)</text>
+        <text x="125" y="301" text-anchor="end" font-size="10" fill="var(--muted-text)" font-family="ui-monospace, Consolas, monospace">TIM2_CH1</text>
+        <text x="125" y="316" text-anchor="end" font-size="9.5" fill="var(--muted-text)" font-family="ui-monospace, Consolas, monospace">50Hz PWM</text>
+
+        <!-- three leads into servo box -->
+        <g stroke="var(--wire)" stroke-width="2" fill="none">
+          <line x1="60" y1="420" x2="400" y2="420"></line>
+          <line x1="400" y1="420" x2="400" y2="220"></line>
+          <line x1="400" y1="220" x2="560" y2="220"></line>
+
+          <line x1="480" y1="60" x2="480" y2="260"></line>
+          <line x1="480" y1="260" x2="560" y2="260"></line>
+
+          <line x1="140" y1="300" x2="560" y2="300"></line>
+        </g>
+        <circle cx="400" cy="420" r="4" fill="var(--ink)"></circle>
+        <circle cx="480" cy="60" r="4" fill="var(--ink)"></circle>
+
+        <!-- servo box -->
+        <rect x="560" y="180" width="180" height="160" rx="6" fill="none" stroke="var(--ink)" stroke-width="2"></rect>
+        <text x="650" y="252" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)" font-family="ui-monospace, Consolas, monospace">SG90 servo</text>
+        <text x="650" y="270" text-anchor="middle" font-size="10" fill="var(--muted-text)" font-family="ui-monospace, Consolas, monospace">bench placeholder</text>
+        <text x="650" y="286" text-anchor="middle" font-size="9.5" fill="var(--muted-text)" font-family="ui-monospace, Consolas, monospace">not the final actuator</text>
+
+        <g text-anchor="start" font-family="ui-monospace, Consolas, monospace" font-size="10.5">
+          <text x="572" y="216" fill="#8a5a2a">brown &rarr; GND</text>
+          <text x="572" y="256" fill="#a8551f">red &rarr; 5V</text>
+          <text x="572" y="296" fill="#c97a1f">orange &rarr; signal</text>
+        </g>
+      </svg>
+      <figcaption>
+        Standard SG90 3-wire color code. <strong>Red to 5V, not 3V3</strong> &mdash; the
+        servo draws more than that rail is sized for. If the board resets when the servo
+        moves under load, switch to a separate 5V supply with grounds still tied together.
+        <code>SERVO_PULSE_MIN_US</code>/<code>SERVO_PULSE_MAX_US</code> (1000&ndash;2000&micro;s)
+        may need retuning once a proper metal-gear servo replaces this placeholder &mdash;
+        the 50Hz frame rate (TIM2 prescaler 31, period 19999) holds for any standard-protocol servo.
+      </figcaption>
+    </figure>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- FIGURE 6 — LOCAL START BUTTON -->
+  <!-- ============================================================ -->
+  <section class="group">
+    <h2>Local start button</h2>
+    <p class="h2-meta"><span class="tag wired">wired</span>ground-crew override, independent of the radio link</p>
+    <figure>
+      <svg viewBox="0 0 700 300" role="img" aria-label="PB0 wired to one leg of a momentary button, the other leg to ground, active low, with an internal pull-up enabled in firmware rather than a physical resistor.">
+        <circle cx="140" cy="150" r="5" fill="none" stroke="var(--ink)" stroke-width="2"></circle>
+        <text x="125" y="136" text-anchor="end" font-size="11" font-weight="700" fill="var(--ink)" font-family="ui-monospace, Consolas, monospace">D3 (PB0)</text>
+        <text x="125" y="151" text-anchor="end" font-size="10" fill="var(--muted-text)" font-family="ui-monospace, Consolas, monospace">LOCAL_START_BTN</text>
+        <text x="125" y="166" text-anchor="end" font-size="9.5" fill="var(--muted-text)" font-family="ui-monospace, Consolas, monospace">active-low, debounced</text>
+
+        <g stroke="var(--wire)" stroke-width="2" fill="none">
+          <line x1="140" y1="150" x2="260" y2="150"></line>
+          <line x1="380" y1="150" x2="500" y2="150"></line>
+        </g>
+        <!-- momentary switch symbol -->
+        <circle cx="260" cy="150" r="5" fill="var(--ink)"></circle>
+        <circle cx="380" cy="150" r="5" fill="var(--ink)"></circle>
+        <line x1="260" y1="150" x2="352" y2="112" stroke="var(--ink)" stroke-width="2"></line>
+        <text x="320" y="98" text-anchor="middle" font-size="11" fill="var(--muted-text)" font-family="ui-monospace, Consolas, monospace">normally open</text>
+
+        <g stroke="var(--ink)" stroke-width="2">
+          <line x1="500" y1="150" x2="500" y2="162"></line>
+          <line x1="488" y1="162" x2="512" y2="162"></line>
+          <line x1="492" y1="168" x2="508" y2="168"></line>
+          <line x1="496" y1="174" x2="504" y2="174"></line>
+        </g>
+        <text x="486" y="194" font-size="13" font-weight="700" fill="var(--ink)" font-family="ui-monospace, Consolas, monospace">GND</text>
+
+        <text x="320" y="240" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ink)" font-family="ui-monospace, Consolas, monospace">panel-mounted momentary button</text>
+        <text x="320" y="256" text-anchor="middle" font-size="10" fill="var(--muted-text)" font-family="ui-monospace, Consolas, monospace">one leg to PB0, other leg to GND</text>
+      </svg>
+      <figcaption>
+        Internal pull-up is enabled in CubeMX &mdash; there is nothing to physically wire
+        for it. One leg to <strong>PB0</strong>, the other straight to <strong>GND</strong>,
+        active-low (pressed = LOW), debounced (<code>INPUT_DEBOUNCE_MS</code>), no
+        hold-to-start timer &mdash; a deliberately placed physical button on an installed
+        unit, not something loose that could get bumped. This works even with the wireless
+        link fully down: <code>start_tick()</code> ORs this signal with the latest wireless
+        start request before gating a crank.
+      </figcaption>
+    </figure>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- FIGURE 7 — KNOWN GAPS -->
+  <!-- ============================================================ -->
+  <section class="group">
+    <h2>Known gaps &mdash; configured, not yet wired</h2>
+    <p class="h2-meta"><span class="tag gap">not wired</span>kill relay &middot; starter relay &middot; battery sense</p>
+    <figure>
+      <svg viewBox="0 0 1040 660" role="img" aria-label="Three panels, each showing an MCU pin ending in a dashed, floating line with no completed connection: PA4 for the kill relay, PB1 for the starter relay, both waiting on a driver stage that has not been designed, and PA6 for battery sense, currently a 1 to 1 placeholder with no voltage divider, marked as unsafe to connect a real battery pack above 3.3 volts to.">
+        <!-- panel A: kill relay -->
+        <g font-family="ui-monospace, Consolas, monospace">
+          <circle cx="190" cy="90" r="5" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="3 3"></circle>
+          <text x="190" y="72" text-anchor="middle" font-size="11" font-weight="700" fill="var(--accent-text)">A3 (PA4)</text>
+          <text x="190" y="58" text-anchor="middle" font-size="10" fill="var(--muted-text)">KILL_RELAY, out</text>
+
+          <line x1="190" y1="90" x2="190" y2="180" stroke="var(--accent)" stroke-width="2" stroke-dasharray="7 5"></line>
+          <line x1="176" y1="172" x2="204" y2="188" stroke="var(--accent)" stroke-width="2"></line>
+          <line x1="204" y1="172" x2="176" y2="188" stroke="var(--accent)" stroke-width="2"></line>
+
+          <rect x="110" y="220" width="160" height="60" rx="6" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="6 5"></rect>
+          <text x="190" y="246" text-anchor="middle" font-size="11" font-weight="700" fill="var(--accent-text)">driver stage</text>
+          <text x="190" y="262" text-anchor="middle" font-size="9.5" fill="var(--muted-text)">TBD: transistor / opto</text>
+
+          <line x1="190" y1="280" x2="190" y2="320" stroke="var(--accent)" stroke-width="2" stroke-dasharray="6 5"></line>
+          <rect x="110" y="320" width="160" height="60" rx="6" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="6 5"></rect>
+          <text x="190" y="346" text-anchor="middle" font-size="11" font-weight="700" fill="var(--accent-text)">relay coil</text>
+          <text x="190" y="362" text-anchor="middle" font-size="9.5" fill="var(--muted-text)">energize-to-kill</text>
+
+          <line x1="190" y1="380" x2="190" y2="410" stroke="var(--accent)" stroke-width="2" stroke-dasharray="6 5"></line>
+          <text x="190" y="428" text-anchor="middle" font-size="10" fill="var(--muted-text)">Moster 185 CDI ground</text>
+
+          <text x="190" y="460" text-anchor="middle" font-size="9.5" fill="var(--muted-text)">kill-wire voltage/current not</text>
+          <text x="190" y="474" text-anchor="middle" font-size="9.5" fill="var(--muted-text)">yet measured &mdash; OPEN-ITEMS</text>
+          <rect x="140" y="500" width="100" height="24" rx="12" fill="none" stroke="var(--accent)" stroke-width="1.5"></rect>
+          <text x="190" y="516" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--accent-text)">NOT WIRED</text>
+        </g>
+
+        <!-- panel B: starter relay -->
+        <g font-family="ui-monospace, Consolas, monospace">
+          <circle cx="520" cy="90" r="5" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="3 3"></circle>
+          <text x="520" y="72" text-anchor="middle" font-size="11" font-weight="700" fill="var(--accent-text)">D6 (PB1)</text>
+          <text x="520" y="58" text-anchor="middle" font-size="10" fill="var(--muted-text)">STARTER_RELAY, out</text>
+
+          <line x1="520" y1="90" x2="520" y2="180" stroke="var(--accent)" stroke-width="2" stroke-dasharray="7 5"></line>
+          <line x1="506" y1="172" x2="534" y2="188" stroke="var(--accent)" stroke-width="2"></line>
+          <line x1="534" y1="172" x2="506" y2="188" stroke="var(--accent)" stroke-width="2"></line>
+
+          <rect x="440" y="220" width="160" height="60" rx="6" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="6 5"></rect>
+          <text x="520" y="246" text-anchor="middle" font-size="11" font-weight="700" fill="var(--accent-text)">driver stage</text>
+          <text x="520" y="262" text-anchor="middle" font-size="9.5" fill="var(--muted-text)">TBD: transistor / opto</text>
+
+          <line x1="520" y1="280" x2="520" y2="320" stroke="var(--accent)" stroke-width="2" stroke-dasharray="6 5"></line>
+          <rect x="440" y="320" width="160" height="60" rx="6" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="6 5"></rect>
+          <text x="520" y="346" text-anchor="middle" font-size="11" font-weight="700" fill="var(--accent-text)">relay coil</text>
+          <text x="520" y="362" text-anchor="middle" font-size="9.5" fill="var(--muted-text)">energize-to-crank</text>
+
+          <line x1="520" y1="380" x2="520" y2="410" stroke="var(--accent)" stroke-width="2" stroke-dasharray="6 5"></line>
+          <text x="520" y="428" text-anchor="middle" font-size="10" fill="var(--muted-text)">starter solenoid</text>
+
+          <text x="520" y="460" text-anchor="middle" font-size="9.5" fill="var(--muted-text)">solenoid coil voltage/current</text>
+          <text x="520" y="474" text-anchor="middle" font-size="9.5" fill="var(--muted-text)">not yet measured &mdash; OPEN-ITEMS</text>
+          <rect x="470" y="500" width="100" height="24" rx="12" fill="none" stroke="var(--accent)" stroke-width="1.5"></rect>
+          <text x="520" y="516" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--accent-text)">NOT WIRED</text>
+        </g>
+
+        <!-- panel C: battery sense -->
+        <g font-family="ui-monospace, Consolas, monospace">
+          <circle cx="850" cy="90" r="5" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="3 3"></circle>
+          <text x="850" y="72" text-anchor="middle" font-size="11" font-weight="700" fill="var(--accent-text)">A5 (PA6)</text>
+          <text x="850" y="58" text-anchor="middle" font-size="10" fill="var(--muted-text)">BATT_SENSE, ADC1_IN11</text>
+
+          <line x1="850" y1="90" x2="850" y2="180" stroke="var(--accent)" stroke-width="2" stroke-dasharray="7 5"></line>
+          <line x1="836" y1="172" x2="864" y2="188" stroke="var(--accent)" stroke-width="2"></line>
+          <line x1="864" y1="172" x2="836" y2="188" stroke="var(--accent)" stroke-width="2"></line>
+
+          <rect x="760" y="220" width="180" height="70" rx="6" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="6 5"></rect>
+          <text x="850" y="248" text-anchor="middle" font-size="11" font-weight="700" fill="var(--accent-text)">1:1 placeholder</text>
+          <text x="850" y="264" text-anchor="middle" font-size="9.5" fill="var(--muted-text)">no divider sized yet</text>
+          <text x="850" y="279" text-anchor="middle" font-size="9.5" fill="var(--muted-text)">(read_battery_mv())</text>
+
+          <rect x="750" y="320" width="200" height="70" rx="6" fill="none" stroke="var(--accent-text)" stroke-width="2"></rect>
+          <text x="850" y="346" text-anchor="middle" font-size="11" font-weight="700" fill="var(--accent-text)">DO NOT connect a pack</text>
+          <text x="850" y="362" text-anchor="middle" font-size="11" font-weight="700" fill="var(--accent-text)">&gt; 3.3V directly to this pin</text>
+          <text x="850" y="378" text-anchor="middle" font-size="9.5" fill="var(--muted-text)">exceeds ADC absolute max</text>
+
+          <text x="850" y="440" text-anchor="middle" font-size="9.5" fill="var(--muted-text)">pack voltage/chemistry not yet</text>
+          <text x="850" y="454" text-anchor="middle" font-size="9.5" fill="var(--muted-text)">chosen &mdash; OPEN-ITEMS</text>
+          <rect x="800" y="500" width="100" height="24" rx="12" fill="none" stroke="var(--accent)" stroke-width="1.5"></rect>
+          <text x="850" y="516" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--accent-text)">NOT WIRED</text>
+        </g>
+      </svg>
+      <figcaption>
+        All three pins are <strong>configured in CubeMX and referenced in firmware</strong>,
+        but floating on the physical board today &mdash; electrically harmless, they just do
+        nothing until wired. Kill and starter relays are both blocked on the same problem:
+        a GPIO can't drive a relay coil directly (needs a transistor/MOSFET or opto driver
+        stage), and the Moster 185's actual kill-wire and starter-solenoid voltage/current
+        haven't been measured yet to spec that stage. Battery sense is the one with an active
+        hazard if skipped: <code>read_battery_mv()</code> currently assumes a 1:1 connection
+        with no divider, so <strong>do not connect a real pack above ~3.3V</strong> until one
+        is sized to the chosen pack's voltage.
+      </figcaption>
+    </figure>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- SOLDER BRIDGE + POWER RAILS -->
+  <!-- ============================================================ -->
+  <section class="group">
+    <h2>Why no solder-bridge rework</h2>
+    <p class="h2-meta">SB16 / SB18 &middot; board stays factory-unmodified</p>
+    <p class="prose">
+      This Nucleo-32 keeps its <strong>SB16</strong> (<code>PA5</code>&harr;<code>PB7</code>)
+      and <strong>SB18</strong> (<code>PA6</code>&harr;<code>PB6</code>) solder bridges intact
+      &mdash; a bridge only causes a conflict when <em>both</em> paired pins are actively
+      driven at once. <code>PA5</code> (servo) and <code>PA6</code> (battery sense) are both
+      used here, but neither <code>PB7</code> nor <code>PB6</code> is used anywhere in this
+      pin plan, so leaving them genuinely unused sidesteps the whole issue without touching
+      the board.
+    </p>
+    <figure>
+      <svg viewBox="0 0 760 260" role="img" aria-label="Two solder bridge pairs shown as small pads connected by a bridge element. SB16 pairs PA5, used for the servo, with PB7, left unused and spare. SB18 pairs PA6, used for battery sense, with PB6, left unused and spare. Neither pair has both sides driven, so the bridges can stay closed.">
+        <g font-family="ui-monospace, Consolas, monospace">
+          <!-- SB16 -->
+          <rect x="60" y="40" width="90" height="40" rx="5" fill="none" stroke="var(--ink)" stroke-width="2"></rect>
+          <text x="105" y="65" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)">PA5</text>
+          <line x1="150" y1="60" x2="230" y2="60" stroke="var(--wire)" stroke-width="4"></line>
+          <text x="190" y="48" text-anchor="middle" font-size="10" fill="var(--muted-text)">SB16</text>
+          <rect x="230" y="40" width="90" height="40" rx="5" fill="none" stroke="var(--muted-line)" stroke-width="2" stroke-dasharray="4 3"></rect>
+          <text x="275" y="65" text-anchor="middle" font-size="13" font-weight="700" fill="var(--muted-text)">PB7</text>
+          <text x="105" y="100" text-anchor="middle" font-size="10" fill="var(--muted-text)">used &mdash; servo PWM</text>
+          <text x="275" y="100" text-anchor="middle" font-size="10" fill="var(--muted-text)">unused &mdash; spare</text>
+
+          <!-- SB18 -->
+          <rect x="60" y="150" width="90" height="40" rx="5" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 3"></rect>
+          <text x="105" y="175" text-anchor="middle" font-size="13" font-weight="700" fill="var(--accent-text)">PA6</text>
+          <line x1="150" y1="170" x2="230" y2="170" stroke="var(--wire)" stroke-width="4"></line>
+          <text x="190" y="158" text-anchor="middle" font-size="10" fill="var(--muted-text)">SB18</text>
+          <rect x="230" y="150" width="90" height="40" rx="5" fill="none" stroke="var(--muted-line)" stroke-width="2" stroke-dasharray="4 3"></rect>
+          <text x="275" y="175" text-anchor="middle" font-size="13" font-weight="700" fill="var(--muted-text)">PB6</text>
+          <text x="105" y="210" text-anchor="middle" font-size="10" fill="var(--accent-text)">claimed &mdash; battery sense (not wired)</text>
+          <text x="275" y="210" text-anchor="middle" font-size="10" fill="var(--muted-text)">unused &mdash; spare</text>
+
+          <text x="450" y="70" font-size="12" fill="var(--muted-text)" width="280">A bridge only conflicts if</text>
+          <text x="450" y="90" font-size="12" fill="var(--muted-text)">both paired pins are driven.</text>
+          <text x="450" y="110" font-size="12" fill="var(--muted-text)">One side unused on each pair</text>
+          <text x="450" y="130" font-size="12" fill="var(--muted-text)">&rarr; bridges stay closed,</text>
+          <text x="450" y="150" font-size="12" fill="var(--muted-text)">no desoldering needed.</text>
+        </g>
+      </svg>
+      <figcaption>
+        This was a deliberate constraint when picking pins for this board, not an accident.
+        The two spare pins in the pin map above (<code>PB6</code>, <code>PB7</code>) are the
+        reason there's still headroom if a future function needs a pin &mdash; using either
+        one is free; using both members of a pair is not.
+      </figcaption>
+    </figure>
+  </section>
+
+  <section class="group" style="margin-bottom: 24px;">
+    <h2>Power rails</h2>
+    <p class="h2-meta">3V3 &middot; 5V &middot; VIN</p>
+    <div class="callout">
+      <span>&#9889;</span>
+      <span><b>3V3</b> for logic and every LED rail on this board. <b>5V</b> is reserved
+      for the servo specifically, sourced from USB through the ST-Link while bench-powered.
+      <b>VIN</b> is left unconnected &mdash; it's an input for external power, not in use here.</span>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- REFERENCE TABLE -->
+  <!-- ============================================================ -->
+  <table>
+    <caption>Full pin table &mdash; receiver-prod</caption>
+    <thead>
+      <tr><th>Function</th><th>Arduino</th><th>STM32</th><th>Dir</th><th>Status</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Radio CE</td><td class="mono">A1</td><td class="mono">PA1 (NRF_CE)</td><td class="note">out</td><td><span class="tag wired">wired</span></td></tr>
+      <tr><td>Radio CSN</td><td class="mono">A2</td><td class="mono">PA3 (NRF_CSN)</td><td class="note">out</td><td><span class="tag wired">wired</span></td></tr>
+      <tr><td>Kill relay</td><td class="mono">A3</td><td class="mono">PA4 (KILL_RELAY)</td><td class="note">out</td><td><span class="tag gap">not wired</span></td></tr>
+      <tr><td>Servo PWM</td><td class="mono">A4</td><td class="mono">PA5 (TIM2_CH1)</td><td class="note">out</td><td><span class="tag wired">wired</span></td></tr>
+      <tr><td>Battery sense</td><td class="mono">A5</td><td class="mono">PA6 (BATT_SENSE, ADC1_IN11)</td><td class="note">analog in</td><td><span class="tag gap">not wired</span></td></tr>
+      <tr><td>Status LED red</td><td class="mono">A6</td><td class="mono">PA7 (LED_RED)</td><td class="note">out</td><td><span class="tag wired">wired</span></td></tr>
+      <tr><td>Local start button</td><td class="mono">D3</td><td class="mono">PB0 (LOCAL_START_BTN)</td><td class="note">in, pull-up</td><td><span class="tag wired">wired</span></td></tr>
+      <tr><td>Starter relay</td><td class="mono">D6</td><td class="mono">PB1 (STARTER_RELAY)</td><td class="note">out</td><td><span class="tag gap">not wired</span></td></tr>
+      <tr><td>Status LED green</td><td class="mono">D9</td><td class="mono">PA8 (LED_GREEN)</td><td class="note">out</td><td><span class="tag wired">wired</span></td></tr>
+      <tr><td>AUX1 (strobe placeholder)</td><td class="mono">D1/TX</td><td class="mono">PA9 (AUX1_OUT)</td><td class="note">out</td><td><span class="tag wired">wired</span></td></tr>
+      <tr><td>AUX2 (smoke placeholder)</td><td class="mono">D0/RX</td><td class="mono">PA10 (AUX2_OUT)</td><td class="note">out</td><td><span class="tag wired">wired</span></td></tr>
+      <tr><td>Cruise indicator LED</td><td class="mono">D10</td><td class="mono">PA11 (CRUISE_LED)</td><td class="note">out</td><td><span class="tag wired">wired</span></td></tr>
+      <tr><td>Radio SCK</td><td class="mono">D13</td><td class="mono">PB3 (SPI1_SCK)</td><td class="note">out</td><td><span class="tag wired">wired</span></td></tr>
+      <tr><td>Radio MISO</td><td class="mono">D12</td><td class="mono">PB4 (SPI1_MISO)</td><td class="note">in</td><td><span class="tag wired">wired</span></td></tr>
+      <tr><td>Radio MOSI</td><td class="mono">D11</td><td class="mono">PB5 (SPI1_MOSI)</td><td class="note">out</td><td><span class="tag wired">wired</span></td></tr>
+    </tbody>
+  </table>
+</main>

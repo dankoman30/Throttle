@@ -1,5 +1,11 @@
 # Wiring — handle-prod (production handle/transmitter, not a bring-up board)
 
+**Visual reference:** `wiring-diagram.html` (open in a browser) draws every
+pin/component below as a schematic; `trigger-filter-wiring.html` is a
+focused close-up of just the trigger's RC anti-alias filter sub-circuit.
+Both are generated from this doc and should be kept in sync with it, not
+treated as an independent source of truth.
+
 Board: **STM32L432KC Nucleo-32** — a fresh, unmodified board (SB16/SB18
 solder bridges NOT removed), same reasoning as receiver-prod: the pin plan
 below never uses both sides of either bridge pair (`PA5`↔`PB7`, `PA6`↔`PB6`)
