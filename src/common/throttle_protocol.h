@@ -78,7 +78,7 @@ typedef struct {
 #define MAX_THROTTLE_STEP_PER_TICK  6       /* rate limit: max change in throttle units per control tick,
                                                 applies during normal operation too, not just recovery */
 
-#define THROTTLE_DEADBAND           3       /* handle-side hysteresis: the mapped trigger value must move at least
+#define THROTTLE_DEADBAND           1       /* handle-side hysteresis: the mapped trigger value must move at least
                                                 this far from the last transmitted value before it updates, so each
                                                 servo position owns a band of trigger values and hand/engine
                                                 vibration doesn't make the servo hunt. Rails (0 and 255) always

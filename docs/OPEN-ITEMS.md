@@ -170,6 +170,15 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   responded far faster than the servo-driven throttle). Pick a servo with
   a genuinely fast rated speed, not just adequate torque - a strong but
   slow servo would undermine responsiveness even with adequate pull force.
+  **Update (2026-08-15):** ruled out software as the cause. The full
+  handle→servo chain's timing budget (EMA settle ~65ms + receiver rate
+  limiter ~42ms + 50Hz PWM update ~20ms) is well under 100ms, nowhere near
+  the lag observed. Confirmed with the SG90 currently **unloaded** (no
+  cable/spring attached): response is near-instant and moves at a steady
+  speed to the target - not a torque-fighting-load deceleration, just the
+  servo's own slew rate being slower than wanted. Since this is unloaded,
+  it isn't even worst-case - the real installed cable+spring load will
+  likely be at least this slow, probably slower.
 - [ ] **Remote servo mount + cable run (ADR 0008)** — the servo is frame-mounted,
   not on the engine, and drives the throttle via a push-pull/Bowden cable. To
   design: servo bracket, cable spec + routing (avoid tight bends), and slack/
@@ -377,9 +386,17 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
     pull-down (~19% signal attenuation) - not worth it. Order the right
     value instead of working around it; keep R at 1kΩ when swapping so
     the loading math doesn't need to be redone.
-  - Tune the EMA `FILTER_SHIFT` and `THROTTLE_DEADBAND` on real hardware
-    once the above is in place. (Raised by instructor feedback on
-    servo-from-analog control: debounce, damping, hysteresis.)
+  - [x] **Tuned the EMA `FILTER_SHIFT` and `THROTTLE_DEADBAND` on real
+    hardware (2026-08-15, `feature/ema-deadband-tuning`).** With the RC
+    filter + oversampling now doing the primary anti-alias job upstream,
+    relaxed both: `FILTER_SHIFT` 2→1 (EMA settling ~130ms→~65ms) and
+    `THROTTLE_DEADBAND` 3→1 (finer resolution, justified by the near-zero
+    jitter measured at held trigger positions in the bench debugger data).
+    Small, borderline-perceptible improvement on the bench - most of the
+    remaining latency turned out to be the SG90 test servo's own slew
+    rate, not filtering; see "Servo selection" below. (Raised by
+    instructor feedback on servo-from-analog control: debounce, damping,
+    hysteresis.)
 - [ ] Generate the STM32CubeIDE projects (none committed yet).
 - [x] ~~Open question: does **kill** warrant a confirmed-delivery/ack path~~ —
   **resolved: no.** Kill's latch+resend already survives arbitrary packet
