@@ -75,14 +75,24 @@ low-impedance source) of enough time to charge the sample capacitor.
 full rail-to-rail range; retune once the pot is wired and its actual travel
 is measured on the bench.
 
-**Anti-alias RC filter (not yet wired):** hand/engine vibration above the
-80Hz sample rate's Nyquist aliases and can't be fixed after the fact - see
-`docs/OPEN-ITEMS.md` "Trigger-ADC anti-alias + oversampling" for the full
-plan (target ~100Hz cutoff, R=1kΩ/C=1.5µF starting values, in series
-between the wiper and the pin with the cap shunting to GND at the same
-node as the pull-down above) and the **required matching change** to the
-trigger channel's ADC sampling time once it's added - the current very
-short `ADC_SAMPLETIME_2CYCLES_5` won't let the sample capacitor charge
+**Anti-alias RC filter (2026-08-14, wired):** hand/engine vibration above
+the 80Hz sample rate's Nyquist aliases and can't be fixed after the fact -
+see `docs/OPEN-ITEMS.md` "Trigger-ADC anti-alias + oversampling" for the
+full reasoning. **R1 = 1kΩ in series between the wiper and the pin; C1 =
+2.2µF electrolytic (50V) from that same node to GND, cutoff ≈72Hz**
+(deliberately chosen below the original ~100Hz estimate for more margin
+under the Moster 185's ~120-130Hz fundamental vibration frequency at max
+RPM). C1 is polarized - **positive lead toward the node (`PA5` side),
+negative to GND**. Sits at the exact same node as the 100kΩ pull-down
+above, in parallel with it - the pull-down is untouched. A proper ceramic
+replacement for C1 is a tracked, non-urgent follow-up (see
+`docs/OPEN-ITEMS.md`) - the on-hand ceramics were too small (0.1µF) to
+reach this cutoff without a series R high enough to meaningfully load
+against the pull-down.
+
+**Required matching change:** the trigger channel's ADC sampling time in
+CubeMX needs lengthening from the current very short
+`ADC_SAMPLETIME_2CYCLES_5` - that won't let the sample capacitor charge
 through the new series resistance. The firmware oversampling half
 (`TRIGGER_OVERSAMPLE_COUNT`) is already in place and doesn't need this to
 work, but the two together are what actually solves aliasing.
