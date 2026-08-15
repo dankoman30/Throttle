@@ -140,7 +140,7 @@ static uint8_t read_throttle_position(void) {
     uint32_t raw = read_throttle_raw_oversampled();
 
     static uint32_t filtered = 0;
-    const uint32_t FILTER_SHIFT = 2; /* simple exponential moving average, tune as needed */
+    const uint32_t FILTER_SHIFT = 1; /* simple exponential moving average, tune as needed */
     filtered = filtered - (filtered >> FILTER_SHIFT) + raw;
     uint32_t smoothed = filtered >> FILTER_SHIFT;
 
