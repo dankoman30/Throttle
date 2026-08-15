@@ -139,6 +139,18 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   pot (simplest, matches what's already proven on the bench) vs. linear/slide
   pot (may suit a different trigger-lever geometry or travel feel better).
   Need to figure out where to even start evaluating this.
+  - **Follow-up once the real sensor is picked: recalibrate
+    `read_throttle_position()`'s ADC-to-throttle mapping.** Bench-tested
+    2026-08-15 on the current pot (after adding the RC anti-alias filter):
+    raw ADC reads a clean, stable `0` at full release but only `~4030` at
+    full pull, not the `4095` the mapping's `(smoothed * 255) / 4095`
+    formula assumes - meaning full trigger pull currently commands ~98%
+    throttle (`mapped` caps around 250), never a true 255, since the
+    deadband's "always update at the rails" rule only forces an update at
+    the literal 0/255 values. Don't fix this for the bench pot - not
+    worth calibrating a part that isn't shipping. Once the real sensor is
+    selected, measure *its* actual min/max on the bench and scale the
+    mapping off those measured values instead of assuming rail-to-rail.
 - [ ] **Handle kill switch is a bench-test stand-in, not the real part.**
   `handle-prod` is currently bench-testing with a normally-open switch
   bridged closed by a jumper wire, purely to unblock testing everything
