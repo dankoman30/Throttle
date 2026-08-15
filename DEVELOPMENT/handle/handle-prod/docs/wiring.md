@@ -1,5 +1,11 @@
 # Wiring — handle-prod (production handle/transmitter, not a bring-up board)
 
+**Visual reference:** `wiring-diagram.html` (open in a browser) draws every
+pin/component below as a schematic; `trigger-filter-wiring.html` is a
+focused close-up of just the trigger's RC anti-alias filter sub-circuit.
+Both are generated from this doc and should be kept in sync with it, not
+treated as an independent source of truth.
+
 Board: **STM32L432KC Nucleo-32** — a fresh, unmodified board (SB16/SB18
 solder bridges NOT removed), same reasoning as receiver-prod: the pin plan
 below never uses both sides of either bridge pair (`PA5`↔`PB7`, `PA6`↔`PB6`)
@@ -74,6 +80,28 @@ low-impedance source) of enough time to charge the sample capacitor.
 `read_throttle_position()`'s 0-4095 → 0-255 mapping currently assumes the
 full rail-to-rail range; retune once the pot is wired and its actual travel
 is measured on the bench.
+
+**Anti-alias RC filter (2026-08-14, wired):** hand/engine vibration above
+the 80Hz sample rate's Nyquist aliases and can't be fixed after the fact -
+see `docs/OPEN-ITEMS.md` "Trigger-ADC anti-alias + oversampling" for the
+full reasoning. **R1 = 1kΩ in series between the wiper and the pin; C1 =
+2.2µF electrolytic (50V) from that same node to GND, cutoff ≈72Hz**
+(deliberately chosen below the original ~100Hz estimate for more margin
+under the Moster 185's ~120-130Hz fundamental vibration frequency at max
+RPM). C1 is polarized - **positive lead toward the node (`PA5` side),
+negative to GND**. Sits at the exact same node as the 100kΩ pull-down
+above, in parallel with it - the pull-down is untouched. A proper ceramic
+replacement for C1 is a tracked, non-urgent follow-up (see
+`docs/OPEN-ITEMS.md`) - the on-hand ceramics were too small (0.1µF) to
+reach this cutoff without a series R high enough to meaningfully load
+against the pull-down.
+
+**Required matching change:** the trigger channel's ADC sampling time in
+CubeMX needs lengthening from the current very short
+`ADC_SAMPLETIME_2CYCLES_5` - that won't let the sample capacitor charge
+through the new series resistance. The firmware oversampling half
+(`TRIGGER_OVERSAMPLE_COUNT`) is already in place and doesn't need this to
+work, but the two together are what actually solves aliasing.
 
 ## Kill switch
 

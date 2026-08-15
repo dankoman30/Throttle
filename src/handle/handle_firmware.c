@@ -104,6 +104,29 @@ static uint32_t millis(void) {
 #endif
 }
 
+/* Takes TRIGGER_OVERSAMPLE_COUNT raw ADC conversions back-to-back and
+ * averages them into one sample. This is the anti-alias half of the
+ * pipeline - it has to happen at the sampling stage itself (before
+ * anything below sees a single, already-aliased value), which is exactly
+ * what the EMA/deadband below can't do after the fact. Negligibly fast
+ * relative to HANDLE_TX_PERIOD_MS even at a lengthened ADC sample time
+ * (see docs/OPEN-ITEMS.md "Trigger-ADC anti-alias + oversampling") - a
+ * handful of back-to-back 12-bit conversions is microseconds, not
+ * milliseconds. */
+static uint32_t read_throttle_raw_oversampled(void) {
+#ifdef HANDLE_PROD_BOARD
+    uint32_t sum = 0;
+    for (uint32_t i = 0; i < TRIGGER_OVERSAMPLE_COUNT; i++) {
+        HAL_ADC_Start(&hadc1);
+        HAL_ADC_PollForConversion(&hadc1, 10);
+        sum += HAL_ADC_GetValue(&hadc1); /* 0-4095, 12-bit */
+    }
+    return sum / TRIGGER_OVERSAMPLE_COUNT;
+#else
+    return 0; /* placeholder */
+#endif
+}
+
 /* Read raw ADC and map to 0-255 throttle scale.
  * Apply a light low-pass filter here so noisy ADC readings don't
  * translate into a jittery servo on the receiving end.
@@ -114,13 +137,7 @@ static uint32_t millis(void) {
  * equivalent of the fail-safe switch polarity: the failure state is the
  * safe state. */
 static uint8_t read_throttle_position(void) {
-#ifdef HANDLE_PROD_BOARD
-    HAL_ADC_Start(&hadc1);
-    HAL_ADC_PollForConversion(&hadc1, 10);
-    uint32_t raw = HAL_ADC_GetValue(&hadc1); /* 0-4095, 12-bit */
-#else
-    uint32_t raw = 0; /* placeholder */
-#endif
+    uint32_t raw = read_throttle_raw_oversampled();
 
     static uint32_t filtered = 0;
     const uint32_t FILTER_SHIFT = 2; /* simple exponential moving average, tune as needed */

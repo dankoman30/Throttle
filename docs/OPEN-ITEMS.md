@@ -139,6 +139,18 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   pot (simplest, matches what's already proven on the bench) vs. linear/slide
   pot (may suit a different trigger-lever geometry or travel feel better).
   Need to figure out where to even start evaluating this.
+  - **Follow-up once the real sensor is picked: recalibrate
+    `read_throttle_position()`'s ADC-to-throttle mapping.** Bench-tested
+    2026-08-15 on the current pot (after adding the RC anti-alias filter):
+    raw ADC reads a clean, stable `0` at full release but only `~4030` at
+    full pull, not the `4095` the mapping's `(smoothed * 255) / 4095`
+    formula assumes - meaning full trigger pull currently commands ~98%
+    throttle (`mapped` caps around 250), never a true 255, since the
+    deadband's "always update at the rails" rule only forces an update at
+    the literal 0/255 values. Don't fix this for the bench pot - not
+    worth calibrating a part that isn't shipping. Once the real sensor is
+    selected, measure *its* actual min/max on the bench and scale the
+    mapping off those measured values instead of assuming rail-to-rail.
 - [ ] **Handle kill switch is a bench-test stand-in, not the real part.**
   `handle-prod` is currently bench-testing with a normally-open switch
   bridged closed by a jumper wire, purely to unblock testing everything
@@ -172,6 +184,11 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
 - [ ] **Cable tolerance to engine movement** — the engine shifts on its rubber
   mounts relative to the frame; the cable run must flex without binding or
   shifting the throttle setpoint.
+- [ ] **Vibration dampeners for receiver mounting (2026-08-14).** The receiver
+  enclosure — and whatever battery ends up inside it, see the cell-format item
+  below — needs isolation from engine vibration, not just a rigid mount to the
+  frame. Evaluate dampening grommets/standoffs or an isolating mount plate
+  between the receiver enclosure and the frame.
 - [ ] **RF range test** — measure real handle↔receiver distance/reliability
   through frame/cage/body to confirm nRF24L01+PA+LNA gives enough margin. NOTE:
   this is a *separate* test from the engine-EMI RPM sweep above — different
@@ -191,11 +208,13 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   between (a) servo on the receiver pack via a dedicated BEC/regulator rail with
   bulk capacitance while MCU+radio sit on a cleaner rail, or (b) a separate servo
   battery. Sized after servo selection.
-  **Current leaning (2026-08-09, not finalized):** receiver + servo on a **2S
-  18650 pack** (7.4–8.4V) through a buck/BEC down to 5V for both the servo
-  and the board; handle on a **single 1S 18650** (3.7–4.2V) through a boost
-  module, since it has no servo and just needs clean 3.3–5V logic power
-  (cheap combined boost+USB-C-charge modules exist for exactly this).
+  **Current leaning (2026-08-09, not finalized):** receiver + servo on a
+  **2S Li-ion pack** (7.4–8.4V) through a buck/BEC down to 5V for both the
+  servo and the board; handle on a **single 1S Li-ion cell** (3.7–4.2V)
+  through a boost module, since it has no servo and just needs clean
+  3.3–5V logic power (cheap combined boost+USB-C-charge modules exist for
+  exactly this). Cell **format** (cylindrical 18650 vs. pouch LiPo) is a
+  separate, still-open decision — see the battery cell format item below.
   Real open sub-questions, not yet resolved:
   - Whether the Nucleo-32 L432KC's 5V/VIN pins tolerate direct external
     injection when not USB-powered — needs checking against the datasheet,
@@ -205,6 +224,36 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   - **Runtime target: ≥2 hours of continuous servo operation** — a real
     sizing constraint for both pack capacity and servo current draw once
     the servo is picked.
+- [ ] **Battery cell format — cylindrical (18650) vs. pouch/soft-cell LiPo,
+  still open (2026-08-14).** Cell count/voltage leaning is unchanged (1S
+  handle, 2S receiver — see "Servo power architecture" above); the physical
+  cell format is a separate, unresolved blocker before packs can be sourced
+  or a battery compartment/mount designed for either unit.
+  - **Cylindrical 18650**, swapped as loose individual cells — hard can gives
+    better mechanical/thermal robustness than pouch, which matters more here
+    given the receiver's engine-adjacent, high-vibration mount (see the
+    vibration-dampener item above). Main risks: spring-contact reliability
+    under vibration (needs contact preload + secondary retention, not just
+    the spring), reverse-insertion risk (needs physical keying, not a
+    warning label alone), and no cell-level protection unless using
+    protected 18650s specifically.
+  - **Pouch LiPo, 2-lead (no balance tap), one pack per cell** — soldered
+    leads + a keyed connector (JST/XT) solve the contact-reliability and
+    reverse-polarity risks cleanly, but pouch cells are more puncture/crush-
+    sensitive and carry more thermal-runaway risk than a hard can, which
+    weighs heavier here than in a typical RC application given the
+    receiver's heat/vibration exposure near the engine. Would need
+    reputable-brand packs (real datasheet, trustworthy mAh rating — matters
+    for hitting the ≥2 hr runtime target) and likely a fireproof-bag storage/
+    charging practice in production if this is the format chosen.
+  - **Either format:** always charge each cell individually to full before
+    combining in series — this is what avoids needing a 2S balance charger/
+    tap at all, regardless of which format is picked. Packs/cells removable
+    and charged externally either way — no onboard charge circuitry planned
+    for either unit.
+  - **Decision deferred; actual battery choice may still change.** Don't
+    finalize the battery-compartment mechanical design or order production
+    cells until this is resolved.
 - [ ] **Receiver battery chemistry/voltage** — pick the receiver pack, then
   replace the placeholder mV values in `RX_BATT` and `read_battery_mv()`'s
   divider scaling with measured values. (Handle-side battery monitoring was
@@ -286,15 +335,51 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   min/max mapped to full-closed/full-open throttle — likely just a firmware
   constant change, not a CubeMX regeneration, unless the new servo uses a
   non-standard control protocol.
-- [ ] **Trigger-ADC anti-alias + oversampling.** The trigger is sampled at 80 Hz,
+- [~] **Trigger-ADC anti-alias + oversampling.** The trigger is sampled at 80 Hz,
   so hand/engine vibration above ~40 Hz **aliases** and no software filter can
-  remove it. Add (hardware) an **RC low-pass on the ADC input** as an anti-alias
-  filter, and (firmware) **oversample the ADC faster than 80 Hz and average**
-  before the EMA. The handle already has an EMA + a deadband/hysteresis
-  (`THROTTLE_DEADBAND`) and the receiver rate-limits the servo, but those sit
-  *after* sampling — they don't fix aliased noise. Tune the EMA `FILTER_SHIFT`
-  and `THROTTLE_DEADBAND` on real hardware. (Raised by instructor feedback on
-  servo-from-analog control: debounce, damping, hysteresis.)
+  remove it. Needs both a hardware and a firmware half - the EMA + deadband/
+  hysteresis (`THROTTLE_DEADBAND`) already in the handle and the receiver's
+  servo rate-limiter all sit *after* sampling, so none of them can fix
+  aliased noise; it has to be addressed at the sampling stage itself.
+  - **Firmware half done (2026-08-14):** `read_throttle_raw_oversampled()`
+    in `src/handle/handle_firmware.c` averages `TRIGGER_OVERSAMPLE_COUNT`
+    (8, `src/common/throttle_protocol.h`) back-to-back raw ADC conversions
+    into one sample before the EMA ever sees it. Helps on its own, but is
+    not a substitute for the hardware half below - oversampling alone
+    can't undo aliasing that already happened in the analog domain.
+  - **Hardware half in progress (2026-08-14):** an **RC low-pass on the
+    ADC input** (`PA5`/`TRIGGER_ADC` on `handle-prod`) as the actual
+    anti-alias filter. **R=1kΩ, C=2.2µF electrolytic (50V, on hand) →
+    cutoff ≈72Hz** - deliberately chosen below the original ~100Hz
+    estimate: comfortably below the Moster 185's ~120-130Hz fundamental
+    vibration frequency at max RPM (more attenuation margin there), while
+    still far above any realistic hand-trigger input speed, so nothing is
+    lost on the input side. Goes in series between the pot wiper and the
+    pin, capacitor from that same node to GND (coexists fine with the
+    existing 100kΩ fail-safe pull-down already there - see
+    `DEVELOPMENT/handle/handle-prod/docs/wiring.md` "Trigger"). Electrolytic
+    is polarized - positive lead to the filter node (`PA5` side), negative
+    to GND (this node is always ≥0V here, so polarity is well-defined).
+    **Must be paired with a longer ADC sampling time** in
+    CubeMX for the trigger channel (currently `ADC_SAMPLETIME_2CYCLES_5`,
+    sized for ~zero source impedance) - the new series R needs a much
+    longer sample window for the ADC's sample-and-hold capacitor to
+    charge fully, or readings silently read low. Treat the RC filter and
+    the sampling-time change as one combined change, and verify a known
+    trigger position (e.g. full release ≈ 0) reads correctly afterward.
+  - **Swap to a proper ceramic cap later (not urgent).** The 2.2µF
+    electrolytic above works fine and unblocks bring-up now, but a
+    ceramic (X7R, 1-2.2µF, 16V+) would be the more correct part for a
+    small-signal analog filter - lower leakage/ESR, unpolarized (no
+    reverse-wiring risk). On-hand ceramics were only 0.1µF ("104"), too
+    small to reach ~72Hz without raising R enough (~22kΩ) to create a
+    real voltage-divider loading problem against the existing 100kΩ
+    pull-down (~19% signal attenuation) - not worth it. Order the right
+    value instead of working around it; keep R at 1kΩ when swapping so
+    the loading math doesn't need to be redone.
+  - Tune the EMA `FILTER_SHIFT` and `THROTTLE_DEADBAND` on real hardware
+    once the above is in place. (Raised by instructor feedback on
+    servo-from-analog control: debounce, damping, hysteresis.)
 - [ ] Generate the STM32CubeIDE projects (none committed yet).
 - [x] ~~Open question: does **kill** warrant a confirmed-delivery/ack path~~ —
   **resolved: no.** Kill's latch+resend already survives arbitrary packet

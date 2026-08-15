@@ -1,5 +1,11 @@
 # Wiring — receiver-prod (production receiver, not the bench rig)
 
+**Visual reference:** `wiring-diagram.html` (open in a browser) draws every
+pin/component below as a schematic, including the three known-gap items
+(kill relay, starter relay, battery sense) visually distinguished from what's
+actually wired. Generated from this doc — keep in sync with it, not an
+independent source of truth.
+
 Board: **STM32L432KC Nucleo-32** — the second `spi-bringup` board ("board B"),
 **unmodified** (SB16/SB18 solder bridges NOT removed). This is deliberate:
 the pin plan below avoids using both sides of either bridge pair
