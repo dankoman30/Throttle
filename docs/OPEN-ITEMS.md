@@ -179,6 +179,41 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   servo's own slew rate being slower than wanted. Since this is unloaded,
   it isn't even worst-case - the real installed cable+spring load will
   likely be at least this slow, probably slower.
+  - [ ] **Fish-scale force + travel measurements taken (2026-08-16), on the
+    existing handle-actuated cable — not yet through the future
+    remote-mount Bowden run.** Per ADR 0008 this is a floor, not final:
+    re-verify once the real cable routing exists, since Bowden friction
+    isn't included here.
+    - **Force:** ~2 lbf breakaway (start of cable movement), rising
+      smoothly to ~5 lbf at 95-98% open, ~6 lbf at fully open. Budget
+      7-8 lbf as a safety margin for spec'ing torque.
+    - **Travel:** 1/4" slack at the lever before cable movement starts,
+      then 7/8" of loaded cable travel to fully open - **1-1/8" (1.125")
+      total linear pull** the servo mechanism must produce end to end.
+    - **Torque/horn-arm sizing:** servo torque (kg·cm) = force (lbf) ×
+      horn radius (in) × 1.152; rotation angle needed ≈ (throw ÷ radius)
+      in radians. A 0.75"-1.0" horn radius needs only ~65-86° of
+      rotation (comfortable margin below a standard ~120° usable range,
+      room for end-stops) at a modest 6.9-9.2 kg·cm even at the 8 lbf
+      margin figure - well under the original 15-25 kg·cm ballpark above.
+      **Torque is no longer the binding constraint** - free to prioritize
+      speed (deg/sec) per the update above.
+    - **Candidate servos researched (2026-08-16), not yet ordered:**
+      Hitec **HS-5645MG** (12.1 kg·cm @ 6V, 0.18 sec/60° ≈ 333°/sec,
+      4.8-6V, metal gear, dual ball bearing) and Hitec **D645MW**
+      (11.4 kg·cm @ 6V / 13.0 kg·cm @ 7.4V, 0.20 sec/60° @ 6V ≈ 300°/sec
+      down to 0.17 sec/60° @ 7.4V ≈ 353°/sec, wider 4.8-8.4V range, 32-bit
+      digital). Both explicitly marketed for throttle/control-surface
+      applications (sustained holding against a load), not just RC-car
+      burst duty - that "continuous duty" positioning is the key filter
+      versus cheap generic "high torque" servos (e.g. MG996R/DS3218MG
+      class), which are speced around brief high-torque bursts and are
+      commonly reported to run hot/fail when held against continuous load
+      for extended periods - exactly our use case (holding against the
+      return spring for the length of a flight). D645MW's wider voltage
+      range is a better match for the "Servo power architecture" 2S-buck
+      leaning below. Neither ordered yet - fish-scale numbers still need
+      re-verification through the real cable run first (see above).
 - [ ] **Remote servo mount + cable run (ADR 0008)** — the servo is frame-mounted,
   not on the engine, and drives the throttle via a push-pull/Bowden cable. To
   design: servo bracket, cable spec + routing (avoid tight bends), and slack/
