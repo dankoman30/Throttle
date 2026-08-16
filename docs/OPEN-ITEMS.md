@@ -158,11 +158,11 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   genuinely **normally-closed** switch/contact block - must be swapped
   before the handle is wired for real. See
   `DEVELOPMENT/handle/handle-prod/docs/wiring.md` "Kill switch".
-- [ ] **Servo selection** — measure pull force/travel across the full stroke
+- [~] **Servo selection** — measure pull force/travel across the full stroke
   **through the full installed cable run** (remote mount adds Bowden friction;
-  the bare throttle cable understates it) before ordering (~15–25 kg·cm digital
-  metal-gear, continuous-duty ballpark). See ADR 0008. Fish scale ordered
-  2026-08-08 for the force measurement, arriving within a day or two.
+  the bare throttle cable understates it) before finalizing (~15–25 kg·cm digital
+  metal-gear, continuous-duty ballpark). See ADR 0008. Fish scale arrived
+  2026-08-16, force/travel measured on the existing handle cable (see below).
   **Prioritize speed/slew rate (deg/sec), second only to safety** - the
   current SG90 placeholder's own mechanical response is a likely major
   contributor to the throttle latency observed on the handle-prod bench
@@ -179,10 +179,66 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   servo's own slew rate being slower than wanted. Since this is unloaded,
   it isn't even worst-case - the real installed cable+spring load will
   likely be at least this slow, probably slower.
+  - [ ] **Fish-scale force + travel measurements taken (2026-08-16), on the
+    existing handle-actuated cable — not yet through the future
+    remote-mount Bowden run.** Per ADR 0008 this is a floor, not final:
+    re-verify once the real cable routing exists, since Bowden friction
+    isn't included here.
+    - **Force:** ~2 lbf breakaway (start of cable movement), rising
+      smoothly to ~5 lbf at 95-98% open, ~6 lbf at fully open. Budget
+      7-8 lbf as a safety margin for spec'ing torque.
+    - **Travel:** 1/4" slack at the lever before cable movement starts,
+      then 7/8" of loaded cable travel to fully open - **1-1/8" (1.125")
+      total linear pull** the servo mechanism must produce end to end.
+    - **Torque/horn-arm sizing:** servo torque (kg·cm) = force (lbf) ×
+      horn radius (in) × 1.152; rotation angle needed ≈ (throw ÷ radius)
+      in radians. A 0.75"-1.0" horn radius needs only ~65-86° of
+      rotation (comfortable margin below a standard ~120° usable range,
+      room for end-stops) at a modest 6.9-9.2 kg·cm even at the 8 lbf
+      margin figure - well under the original 15-25 kg·cm ballpark above.
+      **Torque is no longer the binding constraint** - free to prioritize
+      speed (deg/sec) per the update above.
+    - **Candidates researched (2026-08-16).** First pass: Hitec
+      **HS-5645MG** (12.1 kg·cm @ 6V, 0.18 sec/60° ≈ 333°/sec) and Hitec
+      **D645MW** (11.4-13.0 kg·cm @ 6-7.4V, 0.17-0.20 sec/60° ≈ 300-353°/sec)
+      - both explicitly marketed for throttle/control-surface (sustained
+      holding) duty rather than RC-car burst duty, which is the key filter
+      versus cheap generic "high torque" servos (e.g. MG996R/DS3218MG
+      class) that are commonly reported to run hot/fail under continuous
+      load. **Passed over after checking reviews** - HS-5645MG has
+      recurring complaints of gear backlash/slop and centering drift (some
+      out of the box) and eventual geartrain stripping; D645MW had thin
+      review data plus one failure report (shock-load bashing use, not
+      directly comparable, but not reassuring).
+    - **Decided/ordered (2026-08-16): Savox SC-1256TGP** (the "Hybrid"
+      case listing specifically - aluminum middle case + composite outer
+      housing; note this exact listing had no reviews of its own yet at
+      order time, distinct from the non-"Hybrid" SC-1256TGP listing whose
+      reviews informed this pick - same titanium gears/coreless
+      motor/torque-speed spec, so treated as the same core servo, but
+      worth remembering this specific case variant is less proven).
+      16 kg·cm @ 4.8V / 20 kg·cm @ 6V (comfortable margin above target,
+      absorbs the not-yet-measured Bowden friction), 0.18 sec/60° @ 4.8V /
+      0.15 sec/60° @ 6V (≈400°/sec - faster than both Hitec candidates),
+      25T spline output. Fish-scale numbers still need re-verification
+      through the real cable run once it exists (see above) before
+      finalizing pulse-width mapping.
+    - **Also ordered (2026-08-16): ProTek RC Dual Offset Heavy Duty
+      Clamping Servo Horn (Standard, 25T)** - confirmed spline-matched to
+      the SC-1256TGP. Dual-offset design gives multiple mounting-hole
+      radii on one horn, letting the actual 0.75"-1.0" horn radius (see
+      the torque/rotation-angle math above) be tuned empirically on the
+      bench instead of committing to one fixed radius sight-unseen.
 - [ ] **Remote servo mount + cable run (ADR 0008)** — the servo is frame-mounted,
   not on the engine, and drives the throttle via a push-pull/Bowden cable. To
   design: servo bracket, cable spec + routing (avoid tight bends), and slack/
   end-stops so full servo travel = full throttle stroke. `hardware/mechanical/`.
+  **Cable on hand (2026-08-16): Sullivan Gold-N-Rod pushrod, 36" .032"
+  cable w/ clevis (SUL507)** - flexible stranded-steel cable in an outer
+  housing, the standard RC solution for a remote-servo-to-engine push-pull
+  run. Not yet routed/installed - once the servo mount and routing are
+  designed, re-measure fish-scale force through this actual cable run per
+  ADR 0008 before finalizing the servo pulse-width mapping.
 - [ ] **Confirm throttle return-to-idle spring** — the carb spring must reliably
   pull to idle when the servo is depowered/failed or the cable detaches (the
   mechanical fail-safe); verify the linkage can never jam open. May need a
