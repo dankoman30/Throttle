@@ -210,20 +210,35 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
       out of the box) and eventual geartrain stripping; D645MW had thin
       review data plus one failure report (shock-load bashing use, not
       directly comparable, but not reassuring).
-    - **Decided/ordered (2026-08-16): Savox SC-1256TGP.** 16 kg·cm @ 4.8V
-      / 20 kg·cm @ 6V (comfortable margin above target, absorbs the
-      not-yet-measured Bowden friction), 0.18 sec/60° @ 4.8V / 0.15 sec/60°
-      @ 6V (≈400°/sec - faster than both Hitec candidates), coreless motor,
-      titanium gears, **aluminum center case specifically for cooler
-      running** (directly addresses the continuous-duty/overheating
-      concern, not just a torque/speed number), consistently positive
-      reviews with no backlash/centering complaints found. Ordered;
-      fish-scale numbers still need re-verification through the real cable
-      run once it exists (see above) before finalizing pulse-width mapping.
+    - **Decided/ordered (2026-08-16): Savox SC-1256TGP** (the "Hybrid"
+      case listing specifically - aluminum middle case + composite outer
+      housing; note this exact listing had no reviews of its own yet at
+      order time, distinct from the non-"Hybrid" SC-1256TGP listing whose
+      reviews informed this pick - same titanium gears/coreless
+      motor/torque-speed spec, so treated as the same core servo, but
+      worth remembering this specific case variant is less proven).
+      16 kg·cm @ 4.8V / 20 kg·cm @ 6V (comfortable margin above target,
+      absorbs the not-yet-measured Bowden friction), 0.18 sec/60° @ 4.8V /
+      0.15 sec/60° @ 6V (≈400°/sec - faster than both Hitec candidates),
+      25T spline output. Fish-scale numbers still need re-verification
+      through the real cable run once it exists (see above) before
+      finalizing pulse-width mapping.
+    - **Also ordered (2026-08-16): ProTek RC Dual Offset Heavy Duty
+      Clamping Servo Horn (Standard, 25T)** - confirmed spline-matched to
+      the SC-1256TGP. Dual-offset design gives multiple mounting-hole
+      radii on one horn, letting the actual 0.75"-1.0" horn radius (see
+      the torque/rotation-angle math above) be tuned empirically on the
+      bench instead of committing to one fixed radius sight-unseen.
 - [ ] **Remote servo mount + cable run (ADR 0008)** — the servo is frame-mounted,
   not on the engine, and drives the throttle via a push-pull/Bowden cable. To
   design: servo bracket, cable spec + routing (avoid tight bends), and slack/
   end-stops so full servo travel = full throttle stroke. `hardware/mechanical/`.
+  **Cable on hand (2026-08-16): Sullivan Gold-N-Rod pushrod, 36" .032"
+  cable w/ clevis (SUL507)** - flexible stranded-steel cable in an outer
+  housing, the standard RC solution for a remote-servo-to-engine push-pull
+  run. Not yet routed/installed - once the servo mount and routing are
+  designed, re-measure fish-scale force through this actual cable run per
+  ADR 0008 before finalizing the servo pulse-width mapping.
 - [ ] **Confirm throttle return-to-idle spring** — the carb spring must reliably
   pull to idle when the servo is depowered/failed or the cable detaches (the
   mechanical fail-safe); verify the linkage can never jam open. May need a
