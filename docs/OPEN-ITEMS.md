@@ -158,11 +158,11 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   genuinely **normally-closed** switch/contact block - must be swapped
   before the handle is wired for real. See
   `DEVELOPMENT/handle/handle-prod/docs/wiring.md` "Kill switch".
-- [ ] **Servo selection** — measure pull force/travel across the full stroke
+- [~] **Servo selection** — measure pull force/travel across the full stroke
   **through the full installed cable run** (remote mount adds Bowden friction;
-  the bare throttle cable understates it) before ordering (~15–25 kg·cm digital
-  metal-gear, continuous-duty ballpark). See ADR 0008. Fish scale ordered
-  2026-08-08 for the force measurement, arriving within a day or two.
+  the bare throttle cable understates it) before finalizing (~15–25 kg·cm digital
+  metal-gear, continuous-duty ballpark). See ADR 0008. Fish scale arrived
+  2026-08-16, force/travel measured on the existing handle cable (see below).
   **Prioritize speed/slew rate (deg/sec), second only to safety** - the
   current SG90 placeholder's own mechanical response is a likely major
   contributor to the throttle latency observed on the handle-prod bench
@@ -198,22 +198,28 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
       margin figure - well under the original 15-25 kg·cm ballpark above.
       **Torque is no longer the binding constraint** - free to prioritize
       speed (deg/sec) per the update above.
-    - **Candidate servos researched (2026-08-16), not yet ordered:**
-      Hitec **HS-5645MG** (12.1 kg·cm @ 6V, 0.18 sec/60° ≈ 333°/sec,
-      4.8-6V, metal gear, dual ball bearing) and Hitec **D645MW**
-      (11.4 kg·cm @ 6V / 13.0 kg·cm @ 7.4V, 0.20 sec/60° @ 6V ≈ 300°/sec
-      down to 0.17 sec/60° @ 7.4V ≈ 353°/sec, wider 4.8-8.4V range, 32-bit
-      digital). Both explicitly marketed for throttle/control-surface
-      applications (sustained holding against a load), not just RC-car
-      burst duty - that "continuous duty" positioning is the key filter
+    - **Candidates researched (2026-08-16).** First pass: Hitec
+      **HS-5645MG** (12.1 kg·cm @ 6V, 0.18 sec/60° ≈ 333°/sec) and Hitec
+      **D645MW** (11.4-13.0 kg·cm @ 6-7.4V, 0.17-0.20 sec/60° ≈ 300-353°/sec)
+      - both explicitly marketed for throttle/control-surface (sustained
+      holding) duty rather than RC-car burst duty, which is the key filter
       versus cheap generic "high torque" servos (e.g. MG996R/DS3218MG
-      class), which are speced around brief high-torque bursts and are
-      commonly reported to run hot/fail when held against continuous load
-      for extended periods - exactly our use case (holding against the
-      return spring for the length of a flight). D645MW's wider voltage
-      range is a better match for the "Servo power architecture" 2S-buck
-      leaning below. Neither ordered yet - fish-scale numbers still need
-      re-verification through the real cable run first (see above).
+      class) that are commonly reported to run hot/fail under continuous
+      load. **Passed over after checking reviews** - HS-5645MG has
+      recurring complaints of gear backlash/slop and centering drift (some
+      out of the box) and eventual geartrain stripping; D645MW had thin
+      review data plus one failure report (shock-load bashing use, not
+      directly comparable, but not reassuring).
+    - **Decided/ordered (2026-08-16): Savox SC-1256TGP.** 16 kg·cm @ 4.8V
+      / 20 kg·cm @ 6V (comfortable margin above target, absorbs the
+      not-yet-measured Bowden friction), 0.18 sec/60° @ 4.8V / 0.15 sec/60°
+      @ 6V (≈400°/sec - faster than both Hitec candidates), coreless motor,
+      titanium gears, **aluminum center case specifically for cooler
+      running** (directly addresses the continuous-duty/overheating
+      concern, not just a torque/speed number), consistently positive
+      reviews with no backlash/centering complaints found. Ordered;
+      fish-scale numbers still need re-verification through the real cable
+      run once it exists (see above) before finalizing pulse-width mapping.
 - [ ] **Remote servo mount + cable run (ADR 0008)** — the servo is frame-mounted,
   not on the engine, and drives the throttle via a push-pull/Bowden cable. To
   design: servo bracket, cable spec + routing (avoid tight bends), and slack/
