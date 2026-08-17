@@ -157,13 +157,14 @@
   <p class="eyebrow">handle-prod &middot; trigger circuit</p>
   <h1>Trigger anti-alias filter wiring</h1>
   <p class="sub">
-    Adding a 1k&#0937;/2.2&micro;F RC low-pass in front of A4 (PA5), on the
-    same node as the existing 100k&#0937; fail-safe pull-down. Copper marks
-    what's new today; sage marks what's already there.
+    A 1k&#0937;/2.2&micro;F RC low-pass in front of A4 (PA5), on the
+    same node as the pre-existing 100k&#0937; fail-safe pull-down. Copper
+    marks the filter addition (2026-08-14, ceramic since 2026-08-17); sage
+    marks the original pull-down.
   </p>
 
   <figure>
-    <svg viewBox="0 0 760 460" role="img" aria-label="Schematic showing the trigger potentiometer's wiper feeding pin A4 (PA5) through a new 1 kilohm series resistor. At the junction before the pin, a new 2.2 microfarad electrolytic capacitor and the existing 100 kilohm pull-down resistor both connect to ground, in parallel with each other.">
+    <svg viewBox="0 0 760 460" role="img" aria-label="Schematic showing the trigger potentiometer's wiper feeding pin A4 (PA5) through a 1 kilohm series resistor. At the junction before the pin, a 2.2 microfarad ceramic capacitor and the existing 100 kilohm pull-down resistor both connect to ground, in parallel with each other.">
       <g stroke="var(--wire)" fill="none" stroke-width="2" color="var(--wire)">
         <!-- 3.3V rail -->
         <line x1="60" y1="50" x2="680" y2="50"></line>
@@ -208,15 +209,14 @@
         <line x1="378" y1="262" x2="378" y2="290"></line>
       </g>
 
-      <!-- C1: 2.2uF electrolytic (NEW) - left branch -->
+      <!-- C1: 2.2uF ceramic - left branch -->
       <g>
         <line x1="322" y1="290" x2="322" y2="304" stroke="var(--accent)" stroke-width="2"></line>
         <line x1="304" y1="304" x2="340" y2="304" stroke="var(--accent)" stroke-width="3"></line>
         <line x1="304" y1="320" x2="340" y2="320" stroke="var(--accent)" stroke-width="3"></line>
         <line x1="322" y1="320" x2="322" y2="400" stroke="var(--accent)" stroke-width="2"></line>
-        <text x="298" y="299" text-anchor="end" font-size="15" font-weight="800" fill="var(--accent-text)">+</text>
         <text x="322" y="435" text-anchor="middle" font-size="13" font-family="ui-monospace, Consolas, monospace" font-weight="700" fill="var(--accent-text)">2.2&micro;F</text>
-        <text x="322" y="450" text-anchor="middle" font-size="11" font-family="ui-monospace, Consolas, monospace" fill="var(--muted-text)">electrolytic, 50V</text>
+        <text x="322" y="450" text-anchor="middle" font-size="11" font-family="ui-monospace, Consolas, monospace" fill="var(--muted-text)">ceramic (225), 50V</text>
       </g>
 
       <!-- R2: 100k existing pull-down - right branch -->
@@ -246,18 +246,22 @@
     </svg>
 
     <figcaption>
-      The pot's wiper feeds A4 (PA5) through a <strong>new 1k&#0937; series
+      The pot's wiper feeds A4 (PA5) through a <strong>1k&#0937; series
       resistor</strong>. Right at that same node &mdash; before the pin
-      &mdash; a <strong>new 2.2&micro;F electrolytic capacitor</strong>
-      (positive lead toward the node) and the <strong>existing 100k&#0937;
-      fail-safe pull-down</strong> both run to ground, in parallel with each
-      other. Nothing about the pull-down changes.
+      &mdash; a <strong>2.2&micro;F ceramic capacitor</strong>
+      (not polarized &mdash; no lead orientation to worry about) and the
+      <strong>existing 100k&#0937; fail-safe pull-down</strong> both run to
+      ground, in parallel with each other. The pull-down is unchanged.
+      <strong>R1 must be between the wiper and this node</strong> &mdash;
+      not between the node and the pin &mdash; or the filter's real cutoff
+      ends up set by the pot's own wiper resistance instead of the fixed
+      1k&#0937; (see <code>wiring.md</code>'s 2026-08-17 wiring-bug note).
     </figcaption>
   </figure>
 
   <div class="legend">
-    <span><i class="swatch new"></i> new today</span>
-    <span><i class="swatch existing"></i> already wired, leave alone</span>
+    <span><i class="swatch new"></i> filter addition</span>
+    <span><i class="swatch existing"></i> original pull-down, leave alone</span>
   </div>
 
   <table>
@@ -269,20 +273,20 @@
       <tr>
         <td>R1 &mdash; series resistor</td>
         <td class="part-value">1k&#0937;</td>
-        <td class="note">Between wiper and the node. Sets the filter's source impedance.</td>
-        <td><span class="tag new">new</span></td>
+        <td class="note">Between wiper and the node (not between the node and the pin - see the wiring-bug note above). Sets the filter's source impedance.</td>
+        <td><span class="tag new">filter</span></td>
       </tr>
       <tr>
         <td>C1 &mdash; filter capacitor</td>
         <td class="part-value">2.2&micro;F @ 50V</td>
-        <td class="note">Node to GND. Electrolytic &mdash; <strong>+</strong> lead toward the node, <strong>&minus;</strong> to GND.</td>
-        <td><span class="tag new">new</span></td>
+        <td class="note">Node to GND. Ceramic (EIA-coded <code>225</code>), not polarized &mdash; no lead orientation to worry about. Replaced an electrolytic 2026-08-17.</td>
+        <td><span class="tag new">filter</span></td>
       </tr>
       <tr>
         <td>R2 &mdash; pull-down</td>
         <td class="part-value">100k&#0937;</td>
-        <td class="note">Node to GND. Fail-safe: pulls the pin to 0 if the wiper wire opens.</td>
-        <td><span class="tag existing">existing</span></td>
+        <td class="note">Node to GND. Fail-safe: pulls the pin to 0 if the wiper wire opens (and, in the corrected topology, even if R1 fails open).</td>
+        <td><span class="tag existing">original</span></td>
       </tr>
     </tbody>
   </table>

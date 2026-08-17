@@ -412,36 +412,63 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
     into one sample before the EMA ever sees it. Helps on its own, but is
     not a substitute for the hardware half below - oversampling alone
     can't undo aliasing that already happened in the analog domain.
-  - **Hardware half in progress (2026-08-14):** an **RC low-pass on the
-    ADC input** (`PA5`/`TRIGGER_ADC` on `handle-prod`) as the actual
-    anti-alias filter. **R=1kΩ, C=2.2µF electrolytic (50V, on hand) →
-    cutoff ≈72Hz** - deliberately chosen below the original ~100Hz
-    estimate: comfortably below the Moster 185's ~120-130Hz fundamental
-    vibration frequency at max RPM (more attenuation margin there), while
-    still far above any realistic hand-trigger input speed, so nothing is
-    lost on the input side. Goes in series between the pot wiper and the
-    pin, capacitor from that same node to GND (coexists fine with the
-    existing 100kΩ fail-safe pull-down already there - see
-    `DEVELOPMENT/handle/handle-prod/docs/wiring.md` "Trigger"). Electrolytic
-    is polarized - positive lead to the filter node (`PA5` side), negative
-    to GND (this node is always ≥0V here, so polarity is well-defined).
-    **Must be paired with a longer ADC sampling time** in
-    CubeMX for the trigger channel (currently `ADC_SAMPLETIME_2CYCLES_5`,
-    sized for ~zero source impedance) - the new series R needs a much
-    longer sample window for the ADC's sample-and-hold capacitor to
-    charge fully, or readings silently read low. Treat the RC filter and
-    the sampling-time change as one combined change, and verify a known
-    trigger position (e.g. full release ≈ 0) reads correctly afterward.
-  - **Swap to a proper ceramic cap later (not urgent).** The 2.2µF
-    electrolytic above works fine and unblocks bring-up now, but a
-    ceramic (X7R, 1-2.2µF, 16V+) would be the more correct part for a
-    small-signal analog filter - lower leakage/ESR, unpolarized (no
-    reverse-wiring risk). On-hand ceramics were only 0.1µF ("104"), too
-    small to reach ~72Hz without raising R enough (~22kΩ) to create a
-    real voltage-divider loading problem against the existing 100kΩ
-    pull-down (~19% signal attenuation) - not worth it. Order the right
-    value instead of working around it; keep R at 1kΩ when swapping so
-    the loading math doesn't need to be redone.
+  - **Hardware half wired (2026-08-14), ceramic + wiring-bug fix
+    (2026-08-17):** an **RC low-pass on the ADC input**
+    (`PA5`/`TRIGGER_ADC` on `handle-prod`) as the actual anti-alias
+    filter. **R=1kΩ, C=2.2µF ceramic (50V, `225`) → cutoff ≈72Hz** -
+    deliberately chosen below the original ~100Hz estimate: comfortably
+    below the Moster 185's ~120-130Hz fundamental vibration frequency at
+    max RPM (more attenuation margin there), while still far above any
+    realistic hand-trigger input speed, so nothing is lost on the input
+    side. R1 goes in series between the pot wiper and the filter node;
+    C1 and the existing 100kΩ fail-safe pull-down both connect from that
+    same node to GND, in parallel with each other, and that node is also
+    where the pin taps in - see
+    `DEVELOPMENT/handle/handle-prod/docs/wiring.md` "Trigger" for the
+    full writeup and diagram. **Must be paired with a longer ADC sampling
+    time** in CubeMX for the trigger channel (currently
+    `ADC_SAMPLETIME_2CYCLES_5`, sized for ~zero source impedance) - the
+    series R needs a much longer sample window for the ADC's
+    sample-and-hold capacitor to charge fully, or readings silently read
+    low. Treat the RC filter and the sampling-time change as one combined
+    change, and verify a known trigger position (e.g. full release ≈ 0)
+    reads correctly afterward.
+  - [x] **Ceramic cap swap done (2026-08-17).** Replaced the original
+    2.2µF electrolytic with a 2.2µF ceramic (`225`, from a 24-value 50V
+    kit that finally arrived) - lower leakage/ESR, and genuinely
+    unpolarized (no reverse-wiring risk) rather than "polarity is
+    well-defined here so it's fine," which the electrolytic relied on.
+    Same 1kΩ R1, same node, so the loading/cutoff math is unchanged.
+  - [x] **Wiring bug found + fixed (2026-08-17): R1 was on the wrong side
+    of the filter node since the original 2026-08-14 install.** Actual
+    wiring was `wiper → [node: C1, 100kΩ pull-down] → R1 → pin` instead of
+    the intended `wiper → R1 → [node: C1, 100kΩ pull-down, pin]`. Caught
+    by comparing the physical breadboard against
+    `trigger-filter-wiring.html` while doing the ceramic swap. Two
+    consequences, full detail in `wiring.md`'s 2026-08-17 note:
+    - The calculated 72Hz cutoff was never actually in effect - the real
+      filter resistance was the pot's own (position-dependent) wiper
+      resistance, not the fixed 1kΩ. Bench data collected in this window
+      (e.g. the 2026-08-15 held-position jitter check) only validated
+      static-position noise, not the filter's frequency response, so it
+      didn't catch this.
+    - The wiper-wire fail-safe was **not** compromised (pull-down still
+      correctly forced the pin to 0V if the wiper wire broke), but an
+      **R1 open-failure would have left the pin floating** with no
+      fail-safe path - a real gap in a vibration-heavy environment. Fixed
+      topology protects against both failure modes now.
+    - **Re-verification still needed:** the bench jitter check (breakpoint
+      on `read_throttle_position()`'s `return last_out;`, held positions)
+      should be re-run as a basic regression check, but real validation of
+      the filter's actual frequency response requires vibration - i.e.
+      the engine, not yet available. Tracked as its own follow-up below.
+  - [ ] **Re-verify the trigger filter under real vibration once the
+    engine is available (2026-08-17).** Now that the wiring is corrected,
+    this is the first time the filter can be meaningfully verified at all
+    - prior bench checks only ever confirmed held-position stability, not
+    frequency response. Fold into the existing engine-availability bench
+    items below (loss-of-signal watchdog EMI sweep, etc.) rather than
+    treating as a separate bench session.
   - [x] **Tuned the EMA `FILTER_SHIFT` and `THROTTLE_DEADBAND` on real
     hardware (2026-08-15, `feature/ema-deadband-tuning`).** With the RC
     filter + oversampling now doing the primary anti-alias job upstream,

@@ -81,20 +81,48 @@ low-impedance source) of enough time to charge the sample capacitor.
 full rail-to-rail range; retune once the pot is wired and its actual travel
 is measured on the bench.
 
-**Anti-alias RC filter (2026-08-14, wired):** hand/engine vibration above
-the 80Hz sample rate's Nyquist aliases and can't be fixed after the fact -
-see `docs/OPEN-ITEMS.md` "Trigger-ADC anti-alias + oversampling" for the
-full reasoning. **R1 = 1kΩ in series between the wiper and the pin; C1 =
-2.2µF electrolytic (50V) from that same node to GND, cutoff ≈72Hz**
-(deliberately chosen below the original ~100Hz estimate for more margin
-under the Moster 185's ~120-130Hz fundamental vibration frequency at max
-RPM). C1 is polarized - **positive lead toward the node (`PA5` side),
-negative to GND**. Sits at the exact same node as the 100kΩ pull-down
-above, in parallel with it - the pull-down is untouched. A proper ceramic
-replacement for C1 is a tracked, non-urgent follow-up (see
-`docs/OPEN-ITEMS.md`) - the on-hand ceramics were too small (0.1µF) to
-reach this cutoff without a series R high enough to meaningfully load
-against the pull-down.
+**Anti-alias RC filter (2026-08-14, wired; corrected + upgraded to ceramic
+2026-08-17):** hand/engine vibration above the 80Hz sample rate's Nyquist
+aliases and can't be fixed after the fact - see `docs/OPEN-ITEMS.md`
+"Trigger-ADC anti-alias + oversampling" for the full reasoning. **R1 = 1kΩ
+in series between the wiper and the node; C1 = 2.2µF ceramic (50V,
+EIA-coded `225`) from that node to GND, cutoff ≈72Hz** (deliberately
+chosen below the original ~100Hz estimate for more margin under the
+Moster 185's ~120-130Hz fundamental vibration frequency at max RPM). C1 is
+a ceramic capacitor - **not polarized, no lead orientation to worry
+about** (this is also why it replaced the original electrolytic - see
+below). Sits at the exact same node as the 100kΩ pull-down above, in
+parallel with it - the pull-down is untouched.
+
+**Wiring bug found + fixed (2026-08-17).** From the original 2026-08-14
+install until this date, R1 was physically wired on the *wrong* side of
+the filter node - i.e. `wiper → [node: C1, 100kΩ pull-down] → R1 → pin`,
+instead of the intended `wiper → R1 → [node: C1, 100kΩ pull-down, pin]`.
+Two consequences:
+- **The calculated 72Hz cutoff was never actually in effect.** With C1 on
+  the source side of R1, the filter's real series resistance was the
+  pot's own internal wiper resistance (which varies with trigger
+  position and is generally well under 1kΩ), not the fixed, known 1kΩ -
+  so the real cutoff was higher than 72Hz and drifted with trigger
+  position instead of being fixed. Any bench data collected in this
+  window (e.g. the 2026-08-15 held-position jitter check) didn't actually
+  validate the filter's frequency response - only a static-position
+  jitter check, which this wiring bug wouldn't have shown up in either
+  way.
+- **The wiper-wire fail-safe was never actually compromised** - the
+  pull-down was still directly on the node the wiper wire lands on, so a
+  broken wiper wire still correctly pulled the pin to 0V through R1 (no
+  current flows at DC steady-state, so no drop across R1). But an **R1
+  open-failure would have left the pin fully floating**, stranded past
+  the pull-down with no fail-safe path - a real gap in a vibration-heavy
+  environment where lead/solder fatigue is plausible. The corrected
+  topology (pull-down at the same node as the pin, independent of R1)
+  protects against both failure modes, not just a broken wiper wire.
+
+The original on-hand ceramics (0.1µF) were too small to reach ~72Hz
+without a series R high enough to meaningfully load against the
+pull-down - a proper-value ceramic kit arrived 2026-08-17 and was used for
+this swap instead.
 
 **Required matching change:** the trigger channel's ADC sampling time in
 CubeMX needs lengthening from the current very short
