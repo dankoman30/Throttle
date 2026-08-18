@@ -238,7 +238,7 @@
     <p class="h2-meta">STM32L432KC &middot; 15 of 17 GPIO used &middot; 4 function clusters + 3 known gaps</p>
     <figure>
       <div class="overview-wrap">
-      <svg viewBox="0 0 1340 1000" role="img" aria-label="The STM32L432KC MCU drawn as a central block with fifteen pins around its perimeter, grouped into four clusters: five radio SPI pins on top routing to an nRF24L01 module, five LED pins on the left for status, cruise, and AUX indicators, two pins on the bottom for the servo and local start button, and three pins on the right — kill relay, starter relay, and battery sense — drawn with dashed accent-colored lines and open terminals to show they are not yet wired to anything.">
+      <svg viewBox="0 0 1340 1000" role="img" aria-label="The STM32L432KC MCU drawn as a central block with fifteen pins around its perimeter, grouped into four clusters: five radio SPI pins on top routing to an nRF24L01 module, five LED pins on the left for status, cruise, and AUX indicators, two pins on the bottom for the servo and local start button, and three pins on the right — kill relay and starter relay (pending a driver stage) plus battery sense (permanently unused by design) — drawn with dashed accent-colored lines and open terminals to show none are connected to anything.">
         <!-- MCU block -->
         <rect x="390" y="460" width="520" height="280" rx="8" fill="none" stroke="var(--ink)" stroke-width="2"></rect>
         <text x="650" y="580" text-anchor="middle" font-size="19" font-weight="700" fill="var(--ink)" font-family="ui-monospace, Consolas, monospace">STM32L432KC</text>
@@ -365,8 +365,11 @@
         cruise / AUX LEDs</strong> (left), <strong>servo + local start button</strong>
         (bottom) &mdash; are wired and working. The three pins on the right &mdash;
         <strong>kill relay, starter relay, battery sense</strong> &mdash; are configured
-        in CubeMX and referenced in firmware but sit unconnected on the bench today;
-        each is detailed further down with why. Detailed per-cluster wiring follows below.
+        in CubeMX but sit unconnected: the first two are genuinely pending
+        (blocked on driver-circuit info), while battery sense is
+        <strong>permanently</strong> unused by decision, not a gap to fill.
+        Each is detailed further down with why. Detailed per-cluster wiring
+        follows below.
       </figcaption>
     </figure>
   </section>
@@ -816,10 +819,10 @@
   <!-- FIGURE 7 — KNOWN GAPS -->
   <!-- ============================================================ -->
   <section class="group">
-    <h2>Known gaps &mdash; configured, not yet wired</h2>
-    <p class="h2-meta"><span class="tag gap">not wired</span>kill relay &middot; starter relay &middot; battery sense</p>
+    <h2>Known gaps &mdash; two pending, one permanently unused</h2>
+    <p class="h2-meta"><span class="tag gap">not wired</span>kill relay &middot; starter relay <span class="tag gap">unused by design</span>battery sense</p>
     <figure>
-      <svg viewBox="0 0 1040 660" role="img" aria-label="Three panels, each showing an MCU pin ending in a dashed, floating line with no completed connection: PA4 for the kill relay, PB1 for the starter relay, both waiting on a driver stage that has not been designed, and PA6 for battery sense, currently a 1 to 1 placeholder with no voltage divider, marked as unsafe to connect a real battery pack above 3.3 volts to.">
+      <svg viewBox="0 0 1040 660" role="img" aria-label="Three panels, each showing an MCU pin ending in a dashed, floating line with no completed connection: PA4 for the kill relay and PB1 for the starter relay, both waiting on a driver stage that has not been designed, and PA6 for battery sense, permanently unused by a 2026-08-17 decision to remove all battery sensing, still marked as unsafe to connect a real battery pack above 3.3 volts to since the pin remains a real ADC input electrically.">
         <!-- panel A: kill relay -->
         <g font-family="ui-monospace, Consolas, monospace">
           <circle cx="190" cy="90" r="5" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="3 3"></circle>
@@ -887,31 +890,36 @@
           <line x1="864" y1="172" x2="836" y2="188" stroke="var(--accent)" stroke-width="2"></line>
 
           <rect x="760" y="220" width="180" height="70" rx="6" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="6 5"></rect>
-          <text x="850" y="248" text-anchor="middle" font-size="11" font-weight="700" fill="var(--accent-text)">1:1 placeholder</text>
-          <text x="850" y="264" text-anchor="middle" font-size="9.5" fill="var(--muted-text)">no divider sized yet</text>
-          <text x="850" y="279" text-anchor="middle" font-size="9.5" fill="var(--muted-text)">(read_battery_mv())</text>
+          <text x="850" y="248" text-anchor="middle" font-size="11" font-weight="700" fill="var(--accent-text)">permanently unused</text>
+          <text x="850" y="264" text-anchor="middle" font-size="9.5" fill="var(--muted-text)">no battery sensing anywhere</text>
+          <text x="850" y="279" text-anchor="middle" font-size="9.5" fill="var(--muted-text)">in this project (2026-08-17)</text>
 
           <rect x="750" y="320" width="200" height="70" rx="6" fill="none" stroke="var(--accent-text)" stroke-width="2"></rect>
           <text x="850" y="346" text-anchor="middle" font-size="11" font-weight="700" fill="var(--accent-text)">DO NOT connect a pack</text>
           <text x="850" y="362" text-anchor="middle" font-size="11" font-weight="700" fill="var(--accent-text)">&gt; 3.3V directly to this pin</text>
           <text x="850" y="378" text-anchor="middle" font-size="9.5" fill="var(--muted-text)">exceeds ADC absolute max</text>
 
-          <text x="850" y="440" text-anchor="middle" font-size="9.5" fill="var(--muted-text)">pack voltage/chemistry not yet</text>
-          <text x="850" y="454" text-anchor="middle" font-size="9.5" fill="var(--muted-text)">chosen &mdash; OPEN-ITEMS</text>
+          <text x="850" y="440" text-anchor="middle" font-size="9.5" fill="var(--muted-text)">standalone meters on the packs</text>
+          <text x="850" y="454" text-anchor="middle" font-size="9.5" fill="var(--muted-text)">are the only battery indication</text>
           <rect x="800" y="500" width="100" height="24" rx="12" fill="none" stroke="var(--accent)" stroke-width="1.5"></rect>
-          <text x="850" y="516" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--accent-text)">NOT WIRED</text>
+          <text x="850" y="516" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--accent-text)">UNUSED</text>
         </g>
       </svg>
       <figcaption>
-        All three pins are <strong>configured in CubeMX and referenced in firmware</strong>,
-        but floating on the physical board today &mdash; electrically harmless, they just do
-        nothing until wired. Kill and starter relays are both blocked on the same problem:
-        a GPIO can't drive a relay coil directly (needs a transistor/MOSFET or opto driver
-        stage), and the Moster 185's actual kill-wire and starter-solenoid voltage/current
-        haven't been measured yet to spec that stage. Battery sense is the one with an active
-        hazard if skipped: <code>read_battery_mv()</code> currently assumes a 1:1 connection
-        with no divider, so <strong>do not connect a real pack above ~3.3V</strong> until one
-        is sized to the chosen pack's voltage.
+        Kill and starter relay are both <strong>configured in CubeMX and
+        referenced in firmware</strong>, but floating on the physical board
+        today &mdash; electrically harmless, they just do nothing until
+        wired. Both are blocked on the same problem: a GPIO can't drive a
+        relay coil directly (needs a transistor/MOSFET or opto driver
+        stage), and the Moster 185's actual kill-wire and starter-solenoid
+        voltage/current haven't been measured yet to spec that stage.
+        Battery sense is a different kind of gap: it's <strong>not
+        pending</strong> anything - a 2026-08-17 decision removed all
+        battery sensing from this project, and <code>read_battery_mv()</code>
+        no longer exists. The pin still carries a real electrical hazard
+        though, since it remains a genuine ADC input on the silicon: <strong>never
+        connect a pack above ~3.3V to it</strong>, regardless of what
+        firmware does or doesn't read from it.
       </figcaption>
     </figure>
   </section>
@@ -951,7 +959,7 @@
           <text x="190" y="158" text-anchor="middle" font-size="10" fill="var(--muted-text)">SB18</text>
           <rect x="230" y="150" width="90" height="40" rx="5" fill="none" stroke="var(--muted-line)" stroke-width="2" stroke-dasharray="4 3"></rect>
           <text x="275" y="175" text-anchor="middle" font-size="13" font-weight="700" fill="var(--muted-text)">PB6</text>
-          <text x="105" y="210" text-anchor="middle" font-size="10" fill="var(--accent-text)">claimed &mdash; battery sense (not wired)</text>
+          <text x="105" y="210" text-anchor="middle" font-size="10" fill="var(--accent-text)">claimed &mdash; battery sense (unused by design)</text>
           <text x="275" y="210" text-anchor="middle" font-size="10" fill="var(--muted-text)">unused &mdash; spare</text>
 
           <text x="450" y="70" font-size="12" fill="var(--muted-text)" width="280">A bridge only conflicts if</text>
@@ -994,7 +1002,7 @@
       <tr><td>Radio CSN</td><td class="mono">A2</td><td class="mono">PA3 (NRF_CSN)</td><td class="note">out</td><td><span class="tag wired">wired</span></td></tr>
       <tr><td>Kill relay</td><td class="mono">A3</td><td class="mono">PA4 (KILL_RELAY)</td><td class="note">out</td><td><span class="tag gap">not wired</span></td></tr>
       <tr><td>Servo PWM</td><td class="mono">A4</td><td class="mono">PA5 (TIM2_CH1)</td><td class="note">out</td><td><span class="tag wired">wired</span></td></tr>
-      <tr><td>Battery sense</td><td class="mono">A5</td><td class="mono">PA6 (BATT_SENSE, ADC1_IN11)</td><td class="note">analog in</td><td><span class="tag gap">not wired</span></td></tr>
+      <tr><td>Battery sense</td><td class="mono">A5</td><td class="mono">PA6 (BATT_SENSE, ADC1_IN11)</td><td class="note">analog in</td><td><span class="tag gap">unused by design</span></td></tr>
       <tr><td>Status LED red</td><td class="mono">A6</td><td class="mono">PA7 (LED_RED)</td><td class="note">out</td><td><span class="tag wired">wired</span></td></tr>
       <tr><td>Local start button</td><td class="mono">D3</td><td class="mono">PB0 (LOCAL_START_BTN)</td><td class="note">in, pull-up</td><td><span class="tag wired">wired</span></td></tr>
       <tr><td>Starter relay</td><td class="mono">D6</td><td class="mono">PB1 (STARTER_RELAY)</td><td class="note">out</td><td><span class="tag gap">not wired</span></td></tr>

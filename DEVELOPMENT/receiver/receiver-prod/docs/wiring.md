@@ -1,10 +1,10 @@
 # Wiring — receiver-prod (production receiver, not the bench rig)
 
 **Visual reference:** `wiring-diagram.html` (open in a browser) draws every
-pin/component below as a schematic, including the three known-gap items
-(kill relay, starter relay, battery sense) visually distinguished from what's
-actually wired. Generated from this doc — keep in sync with it, not an
-independent source of truth.
+pin/component below as a schematic, including the two known-gap items (kill
+relay, starter relay) visually distinguished from what's actually wired.
+Generated from this doc — keep in sync with it, not an independent source
+of truth.
 
 Board: **STM32L432KC Nucleo-32** — the second `spi-bringup` board ("board B"),
 **unmodified** (SB16/SB18 solder bridges NOT removed). This is deliberate:
@@ -27,7 +27,7 @@ name)**.
 | Radio CSN | A2 | PA3 (`NRF_CSN`) | out | |
 | Kill relay | A3 | PA4 (`KILL_RELAY`) | out | **Not yet wired** — see "Known gaps" |
 | Servo PWM | A4 | PA5 (`TIM2_CH1`) | out | 50Hz, see "Servo" below |
-| Battery sense | A5 | PA6 (`BATT_SENSE`, `ADC1_IN11`) | analog in | **Not yet wired** — see "Known gaps" |
+| Battery sense | A5 | PA6 (`BATT_SENSE`, `ADC1_IN11`) | analog in | **Permanently unused** — see "Battery sense" below, not a gap to fill |
 | Status LED red | A6 | PA7 (`LED_RED`) | out | |
 | Local start button | D3 | PB0 (`LOCAL_START_BTN`) | in, internal pull-up | |
 | Starter relay | D6 | PB1 (`STARTER_RELAY`) | out | **Not yet wired** — see "Known gaps" |
@@ -115,9 +115,9 @@ individually tuning later if the brightness mismatch bothers you.
 highest first): killed → red, long-long blink; cranking (`STATE_STARTING`)
 → yellow (red+green together), solid; running proxy (latched on a
 voluntary release from cranking, never a forced stop) → green, solid;
-default/armed-never-started → red, lub-dub heartbeat (faster if the
-receiver's own battery is low). This is what shows right after boot or a
-re-arm — not green, unlike before this change.
+default/armed-never-started → red, lub-dub heartbeat (~2.5s cycle, fixed -
+no battery-low speedup, see "Battery sense" below for why). This is what
+shows right after boot or a re-arm — not green, unlike before this change.
 
 ## Cruise indicator LED
 
@@ -165,7 +165,7 @@ restored 2026-08-09 once pins freed up elsewhere on that board.)
 
 ## Known gaps — deliberately left unconnected
 
-These three pins are configured in CubeMX and referenced in firmware, but
+These two pins are configured in CubeMX and referenced in firmware, but
 **not yet wired to anything**, because each is blocked on information this
 project doesn't have yet. Leaving them floating is electrically harmless —
 they just won't do anything meaningful until wired.
@@ -178,12 +178,18 @@ they just won't do anything meaningful until wired.
   voltage/behavior and starter solenoid coil voltage/current haven't been
   measured yet — needed to spec the driver circuit before wiring this for
   real.
-- **Battery sense (A5/PA6)**: `read_battery_mv()` currently uses a 1:1
-  placeholder (no divider) — **do not connect a real battery pack above
-  ~3.3V to this pin** until a proper resistor divider is sized to the
-  chosen pack's voltage (see `docs/OPEN-ITEMS.md` "Battery chemistry/
-  voltage per pack"), or the pack voltage would be fed directly into the
-  ADC pin and exceed its absolute maximum rating.
+
+## Battery sense (A5/PA6) — permanently unused, not a gap
+
+**Decision (2026-08-17): no battery sensing on this board, ever.** The
+`BATT_SENSE`/`ADC1_IN11` channel is still configured in CubeMX (freeing the
+pin would need a CubeMX regenerate, not done as part of this decision), but
+`read_battery_mv()`, `g_batt_low`, and all firmware that consumed them are
+deleted, not just left unwired - this isn't a "measure the pack later" gap
+like the two above. Leave this pin floating; **never connect a battery pack
+to it** regardless of voltage. Standalone battery meters wired straight to
+the packs are the only battery indication either board has (see
+`docs/OPEN-ITEMS.md` "Battery readout wiring").
 
 ## Power rails: 3V3 vs 5V vs VIN
 

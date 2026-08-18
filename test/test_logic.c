@@ -6,17 +6,15 @@
  *
  *     gcc -Wall -Wextra -I. test_logic.c -o test_logic && ./test_logic
  *
- * Covers: CRC8 known vector, sequence rollover, battery bar mapping,
- * low-battery buzzer cadence, and the cruise engage/disengage rules.
- * The cruise + seq functions are static inside the firmware .c files, so
- * the exact logic is mirrored here (kept in lockstep by hand) to test it
- * without dragging in the HAL stubs.
+ * Covers: CRC8 known vector, sequence rollover, and the cruise
+ * engage/disengage rules. The cruise + seq functions are static inside the
+ * firmware .c files, so the exact logic is mirrored here (kept in lockstep
+ * by hand) to test it without dragging in the HAL stubs.
  * ------------------------------------------------------------------- */
 
 #include <stdio.h>
 #include <string.h>
 #include "crc8.h"
-#include "battery_monitor.h"
 #include "throttle_protocol.h"
 
 static int g_fail = 0;
@@ -174,28 +172,6 @@ int main(void) {
     CHECK(!seq_is_newer(0, 0));           /* duplicate is not newer */
     CHECK(!seq_is_newer(200, 5));         /* >127 ahead treated as old/reordered */
     CHECK(seq_is_newer(5, 200));          /* small forward wrap */
-
-    /* --- battery bar mapping (generic 4-LED profile, exercises the shared
-     * battery_monitor.h math used by the receiver) --- */
-    battery_profile_t p = { .full_mv = 8400, .empty_mv = 6000, .low_mv = 6600, .led_count = 4 };
-    CHECK(battery_eval(9000, &p).leds_lit == 4);   /* above full clamps */
-    CHECK(battery_eval(8400, &p).leds_lit == 4);
-    CHECK(battery_eval(5000, &p).leds_lit == 0);   /* below empty */
-    CHECK(battery_eval(6000, &p).leds_lit == 0);   /* exactly empty */
-    CHECK(!battery_eval(8400, &p).low);
-    CHECK(battery_eval(6600, &p).low);             /* at low threshold -> low */
-    CHECK(battery_eval(6500, &p).low);
-    /* just above empty but still charged -> at least one bar, and low flag set */
-    { battery_status_t s = battery_eval(6100, &p); CHECK(s.leds_lit >= 1 && s.low); }
-
-    /* --- buzzer cadence: off unless low, then short beep once per period --- */
-    CHECK(!battery_buzzer_on(false, 0));
-    CHECK(!battery_buzzer_on(false, 100));
-    CHECK(battery_buzzer_on(true, 0));                              /* start of beep */
-    CHECK(battery_buzzer_on(true, BATTERY_BUZZ_ON_MS - 1));
-    CHECK(!battery_buzzer_on(true, BATTERY_BUZZ_ON_MS));            /* beep ended */
-    CHECK(!battery_buzzer_on(true, BATTERY_BUZZ_PERIOD_MS - 1));
-    CHECK(battery_buzzer_on(true, BATTERY_BUZZ_PERIOD_MS));         /* next period */
 
     /* --- cruise: engage holds setpoint through trigger RELEASE (the point) --- */
     { cruise_t c = {0};

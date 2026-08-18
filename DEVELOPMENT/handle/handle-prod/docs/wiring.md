@@ -233,11 +233,13 @@ status LED's state model entirely.
 ## Known gaps — deliberately left unconnected
 
 - **Handle battery power**: onboard battery *sensing* was dropped entirely
-  (2026-08-08 - standalone battery meters on the pack instead), but the
-  board still needs an actual power source for field use, separate from
-  bench power over USB. Pack chemistry/voltage is still open - see
-  `docs/OPEN-ITEMS.md` "Receiver battery chemistry/voltage" (handle's own
-  supply isn't blocked on firmware, just on picking a pack).
+  (2026-08-08 - standalone battery meters on the pack instead; 2026-08-17 -
+  no battery sensing anywhere in this project now, see
+  `docs/OPEN-ITEMS.md` "Battery readout wiring"), but the board still needs
+  an actual power source for field use, separate from bench power over USB.
+  Pack chemistry/voltage is still open - see `docs/OPEN-ITEMS.md` "Servo
+  power architecture (decision)" (handle's own supply isn't blocked on
+  firmware, just on picking a pack).
 
 ## Power rails: 3V3 vs 5V vs VIN
 

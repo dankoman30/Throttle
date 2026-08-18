@@ -225,7 +225,7 @@ overwriting your edit on next save) — search for both
 their own) and fix the `listOptionValue` entries there.
 
 This lets `bench_app.c`'s `#include "receiver_firmware.c"` and the shared
-`#include "throttle_protocol.h"` / `"crc8.h"` / `"battery_monitor.h"`
+`#include "throttle_protocol.h"` / `"crc8.h"`
 resolve without copying any files into the CubeIDE project.
 
 ## 9. Copy in the bench app source

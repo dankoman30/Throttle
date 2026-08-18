@@ -340,7 +340,6 @@ void bench_app_tick(void) {
         if (!g_ramping_to_idle) {
             step_toward_target(g_target_throttle);
         }
-        battery_tick();
     }
 
     bench_actuation_tick(now);
