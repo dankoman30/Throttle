@@ -545,14 +545,13 @@
         <line x1="600" y1="1432" x2="600" y2="1460"></line>
       </g>
 
-      <!-- C1: 2.2uF electrolytic (NEW) -->
+      <!-- C1: 2.2uF ceramic -->
       <line x1="520" y1="1460" x2="520" y2="1480" stroke="var(--accent)" stroke-width="2.5"></line>
       <line x1="504" y1="1480" x2="536" y2="1480" stroke="var(--accent)" stroke-width="3.5"></line>
       <line x1="504" y1="1500" x2="536" y2="1500" stroke="var(--accent)" stroke-width="3.5"></line>
       <line x1="520" y1="1500" x2="520" y2="1640" stroke="var(--accent)" stroke-width="2.5"></line>
-      <text x="498" y="1479" text-anchor="end" font-size="17" font-weight="800" fill="var(--accent-text)">+</text>
       <text x="520" y="1670" text-anchor="middle" font-size="15" font-weight="700" font-family="ui-monospace, Consolas, monospace" fill="var(--accent-text)">2.2&micro;F</text>
-      <text x="520" y="1688" text-anchor="middle" font-size="12" font-family="ui-monospace, Consolas, monospace" fill="var(--muted-text)">electrolytic, 50V</text>
+      <text x="520" y="1688" text-anchor="middle" font-size="12" font-family="ui-monospace, Consolas, monospace" fill="var(--muted-text)">ceramic (225), 50V</text>
 
       <!-- R2: 100k existing pull-down -->
       <line x1="600" y1="1460" x2="600" y2="1480" stroke="var(--wire)" stroke-width="2"></line>
@@ -598,16 +597,18 @@
         &mdash; it's today's plain bench jumper standing in for it.
       </p>
       <p>
-        Copper marks the new anti-alias filter (R1, C1, added 2026-08-14);
-        sage marks everything else already wired and, where noted,
-        confirmed working on real hardware 2026-08-09.
+        Copper marks the anti-alias filter (R1, C1 - added 2026-08-14,
+        ceramic + a wiring-bug fix 2026-08-17, see this board's
+        <code>wiring.md</code>); sage marks everything else already
+        wired and, where noted, confirmed working on real hardware
+        2026-08-09.
       </p>
     </figcaption>
   </figure>
 
   <div class="legend">
     <span><i class="swatch wire"></i> wired &mdash; existing</span>
-    <span><i class="swatch accent"></i> new today &mdash; trigger anti-alias filter</span>
+    <span><i class="swatch accent"></i> trigger anti-alias filter</span>
     <span><i class="swatch warn"></i> stand-in / deliberately unconnected</span>
   </div>
 
@@ -624,7 +625,7 @@
           <tr><td>Radio CE</td><td class="mono">A1</td><td class="mono">PA1 &middot; NRF_CE</td><td class="note">out</td><td class="note">&mdash;</td><td class="note"></td></tr>
           <tr><td>Radio CSN</td><td class="mono">A2</td><td class="mono">PA3 &middot; NRF_CSN</td><td class="note">out</td><td class="note">&mdash;</td><td class="note"></td></tr>
           <tr><td>Kill switch</td><td class="mono">A3</td><td class="mono">PA4 &middot; KILL_SW</td><td class="note">in, pull-up</td><td class="note">internal</td><td class="note">active-high (open/broken = kill) &mdash; <span class="tag warn">bench jumper</span> stand-in today, see below</td></tr>
-          <tr><td>Trigger position</td><td class="mono">A4</td><td class="mono">PA5 &middot; TRIGGER_ADC / ADC1_IN10</td><td class="note">analog in</td><td class="mono part-value">100k&#0937; pull-down</td><td class="note">wiper node &rarr; GND, plus new <span class="tag new">1k&#0937; + 2.2&micro;F filter</span></td></tr>
+          <tr><td>Trigger position</td><td class="mono">A4</td><td class="mono">PA5 &middot; TRIGGER_ADC / ADC1_IN10</td><td class="note">analog in</td><td class="mono part-value">100k&#0937; pull-down</td><td class="note">wiper node &rarr; GND, plus <span class="tag new">1k&#0937; + 2.2&micro;F filter</span></td></tr>
           <tr><td>AUX2 switch (smoke)</td><td class="mono">A5</td><td class="mono">PA6 &middot; AUX2_SW</td><td class="note">in, pull-down</td><td class="note">internal</td><td class="note">momentary, active-high, other leg &rarr; <strong>3V3</strong></td></tr>
           <tr><td>Cruise button</td><td class="mono">A6</td><td class="mono">PA7 &middot; CRUISE_BTN</td><td class="note">in, pull-down</td><td class="note">internal</td><td class="note">active-high (closed = pressed), other leg &rarr; <strong>3V3</strong></td></tr>
           <tr><td>Start button</td><td class="mono">D3</td><td class="mono">PB0 &middot; START_BTN</td><td class="note">in, pull-up</td><td class="note">internal</td><td class="note">active-low (pressed = LOW), other leg &rarr; GND</td></tr>
@@ -652,20 +653,20 @@
           <tr>
             <td>R1 &mdash; series resistor</td>
             <td class="mono part-value">1k&#0937;</td>
-            <td class="note">Between wiper and the node. Sets the filter's source impedance; cutoff &asymp; 72Hz with C1.</td>
-            <td><span class="tag new">new</span></td>
+            <td class="note">Between wiper and the node (not between the node and the pin - a 2026-08-17 wiring bug had this reversed). Sets the filter's source impedance; cutoff &asymp; 72Hz with C1.</td>
+            <td><span class="tag new">filter</span></td>
           </tr>
           <tr>
             <td>C1 &mdash; filter capacitor</td>
             <td class="mono part-value">2.2&micro;F @ 50V</td>
-            <td class="note">Node to GND. Electrolytic &mdash; <strong>+</strong> lead toward the node, <strong>&minus;</strong> to GND.</td>
-            <td><span class="tag new">new</span></td>
+            <td class="note">Node to GND. Ceramic (EIA-coded <code>225</code>), not polarized. Replaced an electrolytic 2026-08-17.</td>
+            <td><span class="tag new">filter</span></td>
           </tr>
           <tr>
             <td>R2 &mdash; pull-down</td>
             <td class="mono part-value">100k&#0937;</td>
-            <td class="note">Node to GND, in parallel with C1. Fail-safe: pulls the pin to 0 if the wiper wire opens.</td>
-            <td><span class="tag existing">existing</span></td>
+            <td class="note">Node to GND, in parallel with C1. Fail-safe: pulls the pin to 0 if the wiper wire opens (and, in the corrected topology, even if R1 fails open).</td>
+            <td><span class="tag existing">original</span></td>
           </tr>
         </tbody>
       </table>
