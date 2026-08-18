@@ -10,13 +10,13 @@ Read `docs/PROJECT_DESIGN.md` first — it holds the rationale (why no radio-lev
 
 ## Layout
 
-`src/common/` — shared contract (`throttle_protocol.h`, `crc8.h`, `battery_monitor.h`), compiled into both ends and must stay byte-identical. `src/handle/` — transmitter. `src/receiver/` — receiver. `test/` — host-side logic tests. `hardware/`, `docs/` — designs and docs. `.claude/agents/` — `safety-reviewer` and `protocol-guardian` review subagents.
+`src/common/` — shared contract (`throttle_protocol.h`, `crc8.h`, `led_blink.h`), compiled into both ends and must stay byte-identical. `src/handle/` — transmitter. `src/receiver/` — receiver. `test/` — host-side logic tests. `hardware/`, `docs/` — designs and docs. `.claude/agents/` — `safety-reviewer` and `protocol-guardian` review subagents.
 
 ## Build / test
 
 There is **no committed embedded build system** — no CMake, Makefile, or STM32CubeIDE `.project`. The `.c` files are HAL/RF24 stubs: `millis()` returns 0, ADC/GPIO/radio calls are commented out, and there is no `main()` entry point (functions are named `handle_firmware_main` / `receiver_firmware_main`). Building for real requires generating an STM32CubeIDE project, wiring up the peripheral inits marked `/* fill in */`, and linking against a HAL port of RF24 (TMRh20).
 
-The pure logic has a host-side test harness (`test/test_logic.c`) — CRC8 vector (`0xA1`), sequence rollover, battery mapping, cruise, and kill debounce. Shared headers live in `src/common/`, so every build needs `-Isrc/common`:
+The pure logic has a host-side test harness (`test/test_logic.c`) — CRC8 vector (`0xA1`), sequence rollover, cruise, and kill debounce. Shared headers live in `src/common/`, so every build needs `-Isrc/common`:
 
 ```sh
 # host-side logic tests

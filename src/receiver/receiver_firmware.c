@@ -21,7 +21,6 @@
 #include <stdbool.h>
 #include "throttle_protocol.h"
 #include "crc8.h"
-#include "battery_monitor.h"
 #ifdef USE_HAL_DRIVER
 #include "stm32l4xx_hal.h" /* HAL_GetTick() for millis() below */
 #endif
@@ -94,16 +93,6 @@ static bool      g_local_start_pressed = false;   /* current debounced local but
 static bool      g_crank_is_local_only = false;   /* was wireless NOT involved in triggering the in-progress crank? set by begin_crank(), read by crank_tick() */
 static bool      g_start_req_prev = false;        /* previous tick's combined (wireless OR local) start request, for rising-edge detection */
 static uint32_t  g_starter_cooldown_until_ms = 0; /* refuse a new crank until this time (set only on a forced stop) */
-
-/* Local battery monitor state (receiver pack only - no telemetry to handle). */
-static uint32_t  g_batt_last_poll_ms = 0;
-static bool      g_batt_low = false;
-
-/* Receiver pack profile. Example: 2S LiFePO4 near the engine; measure real
- * full/empty/low points and the divider before trusting these numbers. */
-static const battery_profile_t RX_BATT = {
-    .full_mv = 7200, .empty_mv = 5000, .low_mv = 5600, .led_count = 4
-};
 
 static uint32_t millis(void) {
 #ifdef USE_HAL_DRIVER
@@ -234,51 +223,6 @@ static void apply_aux_outputs(const throttle_packet_t *pkt) {
     g_aux2_state = (pkt->flags & CMD_FLAG_AUX2) != 0;
     // HAL_GPIO_WritePin(AUX2_OUT_GPIO_Port, AUX2_OUT_Pin, g_aux2_state ? GPIO_PIN_SET : GPIO_PIN_RESET);
     g_cruise_active = (pkt->flags & CMD_FLAG_CRUISE) != 0;
-}
-
-/* --- Local battery monitor (receiver side) --- identical scheme to the
- * handle, on this unit's own pack. set_battery_leds()/set_buzzer() stay
- * no-op stubs (this board folds low-battery indication into the tri-color
- * status LED instead - see prod_app.c); g_batt_low below is still the real,
- * externally-readable signal driving that. */
-static uint16_t read_battery_mv(void) {
-#ifdef RECEIVER_PROD_BOARD
-    HAL_ADC_Start(&hadc1);
-    HAL_ADC_PollForConversion(&hadc1, 10);
-    uint32_t raw = HAL_ADC_GetValue(&hadc1);
-    /* 12-bit ADC, VDDA ~= 3300mV reference, 1:1 (no divider) as a
-     * placeholder - MUST be replaced with the real resistor-divider ratio
-     * before ever connecting an actual battery pack above ~3.3V, or the
-     * pack voltage will be fed directly into the ADC pin and exceed its
-     * absolute max rating. See docs/OPEN-ITEMS.md "Battery chemistry/
-     * voltage per pack". */
-    return (uint16_t)((raw * 3300u) / 4095u);
-#else
-    // uint32_t raw = HAL_ADC_GetValue(&hadc_batt);
-    // return (uint16_t)(raw * ADC_MV_PER_LSB * DIVIDER_RATIO);
-    return RX_BATT.full_mv; /* placeholder: pretend full */
-#endif
-}
-
-static void set_battery_leds(uint8_t lit) {
-    (void)lit; /* drive the bar-graph LED GPIOs: light 'lit' of RX_BATT.led_count */
-}
-
-static void set_buzzer(bool on) {
-    (void)on;  /* drive the piezo GPIO (or start/stop a PWM tone) */
-}
-
-static void battery_tick(void) {
-    uint32_t now = millis();
-    static bool first = true;   /* poll once immediately so the LED bar lights at power-on */
-    if (first || (now - g_batt_last_poll_ms) >= BATTERY_POLL_MS) {
-        first = false;
-        g_batt_last_poll_ms = now;
-        battery_status_t st = battery_eval(read_battery_mv(), &RX_BATT);
-        set_battery_leds(st.leds_lit);
-        g_batt_low = st.low;
-    }
-    set_buzzer(battery_buzzer_on(g_batt_low, now));
 }
 
 /* Sequence check accounting for 0-255 rollover.
@@ -495,7 +439,6 @@ int receiver_firmware_main(void) {
             if (!g_ramping_to_idle) {
                 step_toward_target(g_target_throttle);
             }
-            battery_tick(); /* independent of packet arrival; non-blocking */
         }
     }
 }

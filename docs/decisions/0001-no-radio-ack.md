@@ -25,8 +25,9 @@ resent every packet, so a brief press produces a sustained stream (see
 
 Revisited whether to make the link bidirectional — both for confirmed delivery
 on the control uplink (this ADR's original open question) and, separately, for
-a receiver→handle telemetry downlink (receiver battery, receiver state,
-current throttle position — none of which currently reach the pilot).
+a receiver→handle telemetry downlink (receiver state, current throttle
+position — neither of which currently reach the pilot; battery level is no
+longer a candidate, see the 2026-08-17 addendum below).
 
 **These are two separate questions, not one "go 2-way" decision:**
 confirmed-delivery control and best-effort telemetry have very different risk
@@ -55,10 +56,9 @@ without new bench evidence.**
 
 **Telemetry downlink: worth pursuing, but as a separate, deferred,
 structurally-isolated feature — not part of first radio bring-up.**
-- The gap is real: receiver battery level and receiver state currently have
-  no path to the pilot at all — the battery LED bar and buzzer live at the
-  receiver, mounted next to the engine, not somewhere a pilot in flight can
-  reliably see or hear over engine noise.
+- The gap is real: receiver state currently has no path to the pilot at
+  all - it's only ever visible on the receiver's own status LED, mounted
+  next to the engine, not somewhere a pilot in flight can reliably see.
 - If/when built: strictly one-way (receiver → handle), a separate packet
   type/pipe from control, and architected so the handle's 80Hz control-send
   loop stays authoritative — it only opportunistically listens for telemetry
@@ -77,10 +77,18 @@ structurally-isolated feature — not part of first radio bring-up.**
 ### Addendum (2026-08-08): what the handle should show once telemetry exists
 
 Pilot requirement, recorded ahead of implementation: the handle's own display
-should show **both packs' battery level side by side** (its own, read
-locally as today; the receiver's, via telemetry once built) plus the
+should show ~~**both packs' battery level side by side** (its own, read
+locally as today; the receiver's, via telemetry once built)~~ plus the
 **receiver's system status** (cranking / idle-armed / killed, mirroring
 `receiver_firmware.c`'s `throttle_state_t`). All of this is receive-side
 UI work on the handle - doesn't change anything about the telemetry
 transport constraints above (still one-way, still cosmetic-only, still
 never gating a control packet).
+
+**Battery-level half superseded (2026-08-17): no battery indication of any
+kind, on either board, ever - not local, not telemetered.** All battery
+sensing was removed project-wide (see `docs/OPEN-ITEMS.md` "Battery readout
+wiring"); standalone meters on the packs are the only battery indication
+either unit has, by decision. If telemetry is ever built, it carries
+**receiver system status only** - the battery-level half of this pilot
+requirement no longer applies.

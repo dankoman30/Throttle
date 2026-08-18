@@ -23,7 +23,7 @@ peripheral count needs it); move to a smaller custom footprint for production.
 - The **RF24 (TMRh20) → HAL port** stays on the critical path: RF24 is
   Arduino-first, so the SPI/CE/CSN/IRQ layer must be adapted to HAL. (Choosing
   the Arduino core would have removed this task — deliberately not taken.)
-- Pure logic (protocol, CRC8, watchdog, cruise, kill debounce, battery mapping)
+- Pure logic (protocol, CRC8, watchdog, cruise, kill debounce)
   is framework-agnostic and already lives in `src/common/` + the `.c` files;
   only the thin hardware wrappers marked `/* fill in */` are HAL-specific.
 

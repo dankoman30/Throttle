@@ -87,14 +87,14 @@ static void handle_app_status_led_tick(uint32_t now) {
 
     bool red = false, green = false;
     if (g_kill_latched) {
-        red = blink_pattern_tick(KILL_PATTERN, KILL_PATTERN_LEN, &g_handle_kill_blink, now, 100u);
+        red = blink_pattern_tick(KILL_PATTERN, KILL_PATTERN_LEN, &g_handle_kill_blink, now);
     } else if (g_start_hold_confirmed) {
         red = true;
         green = true; /* yellow */
     } else if (g_handle_running_proxy) {
         green = true;
     } else {
-        bool beat = blink_pattern_tick(HEARTBEAT_PATTERN, HEARTBEAT_PATTERN_LEN, &g_handle_heartbeat_blink, now, 100u);
+        bool beat = blink_pattern_tick(HEARTBEAT_PATTERN, HEARTBEAT_PATTERN_LEN, &g_handle_heartbeat_blink, now);
         /* Test builds (UNIT_NUMBER == 0xFF) invert the heartbeat: mostly ON
          * with brief OFF blips, instead of mostly off with brief pulses -
          * an unmistakable "this is not a real paired unit" visual on real
