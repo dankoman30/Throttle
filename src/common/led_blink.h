@@ -15,8 +15,8 @@
  *               kill). Lub-dub: two quick pulses, then a longer pause.
  *   KILL      - overrides the heartbeat once latched. Long-long: two
  *               slower, more deliberate pulses.
- * Heartbeat ~5000ms/cycle, kill ~1000ms/cycle, both at 100% scale - tune
- * like any other timing constant in this project, on the bench.
+ * Heartbeat ~2500ms/cycle, kill ~1000ms/cycle - tune like any other timing
+ * constant in this project, on the bench.
  * ------------------------------------------------------------------- */
 
 typedef struct {
@@ -25,10 +25,10 @@ typedef struct {
 } blink_step_t;
 
 static const blink_step_t HEARTBEAT_PATTERN[] = {
-    { true,  250 },
-    { false, 300 },
-    { true,  250 },
-    { false, 4200 },
+    { true,  125 },
+    { false, 150 },
+    { true,  125 },
+    { false, 2100 },
 };
 #define HEARTBEAT_PATTERN_LEN (sizeof(HEARTBEAT_PATTERN) / sizeof(HEARTBEAT_PATTERN[0]))
 
@@ -48,14 +48,10 @@ typedef struct {
 } blink_state_t;
 
 /* Cycles 'state' through 'pattern' (length 'len'), looping back to the
- * start, scaling each step's duration by scale_pct/100 (e.g. 50 = twice as
- * fast, for the receiver's low-battery heartbeat speedup). Returns whether
- * the LED should be ON right now. */
+ * start. Returns whether the LED should be ON right now. */
 static inline bool blink_pattern_tick(const blink_step_t *pattern, uint8_t len,
-                                       blink_state_t *state, uint32_t now,
-                                       uint16_t scale_pct) {
-    uint32_t dur = ((uint32_t)pattern[state->step_idx].duration_ms * scale_pct) / 100u;
-    if ((now - state->step_start_ms) >= dur) {
+                                       blink_state_t *state, uint32_t now) {
+    if ((now - state->step_start_ms) >= pattern[state->step_idx].duration_ms) {
         state->step_start_ms = now;
         state->step_idx = (uint8_t)((state->step_idx + 1) % len);
     }

@@ -11,17 +11,17 @@
  * LED/relay/accessory outputs that receiver_firmware.c only stubs out.
  *
  * src/receiver/receiver_firmware.c is pulled in below via #include and is
- * NOT modified for this board beyond three small, reviewed exceptions made
+ * NOT modified for this board beyond two small, reviewed exceptions made
  * upstream in that file itself (not here):
  *   - millis() calls HAL_GetTick() when USE_HAL_DRIVER is defined (already
  *     true for the bench rig too - a hardware wrapper, not a safety-logic
  *     change).
- *   - read_local_start_button() and read_battery_mv() read the real
- *     GPIO/ADC when RECEIVER_PROD_BOARD is defined (only true here, not on
- *     the bench rig). Both are genuine inputs the safety/battery logic
- *     directly calls and depends on, unlike the purely-output stubs below
- *     which this file drives externally instead by observing already-
- *     decided state (g_state, g_current_servo_throttle, g_batt_low, ...).
+ *   - read_local_start_button() reads the real GPIO when RECEIVER_PROD_BOARD
+ *     is defined (only true here, not on the bench rig) - a genuine input
+ *     the safety logic directly calls and depends on, unlike the purely-
+ *     output stubs below which this file drives externally instead by
+ *     observing already-decided state (g_state, g_current_servo_throttle,
+ *     ...).
  *   - apply_aux_outputs() stores into g_aux1_state/g_aux2_state/
  *     g_cruise_active so this file can read the latest commanded/observed
  *     state independent of packet arrival, same externally-observed
@@ -148,15 +148,14 @@ static void prod_status_led_tick(uint32_t now) {
 
     bool red = false, green = false;
     if (g_state == STATE_KILLED) {
-        red = blink_pattern_tick(KILL_PATTERN, KILL_PATTERN_LEN, &g_prod_kill_blink, now, 100u);
+        red = blink_pattern_tick(KILL_PATTERN, KILL_PATTERN_LEN, &g_prod_kill_blink, now);
     } else if (g_state == STATE_STARTING) {
         red = true;
         green = true; /* yellow */
     } else if (g_prod_running_proxy) {
         green = true;
     } else {
-        uint16_t scale = g_batt_low ? 50u : 100u;
-        bool beat = blink_pattern_tick(HEARTBEAT_PATTERN, HEARTBEAT_PATTERN_LEN, &g_prod_heartbeat_blink, now, scale);
+        bool beat = blink_pattern_tick(HEARTBEAT_PATTERN, HEARTBEAT_PATTERN_LEN, &g_prod_heartbeat_blink, now);
         /* Test builds (UNIT_NUMBER == 0xFF) invert the heartbeat: mostly ON
          * with brief OFF blips, instead of mostly off with brief pulses -
          * an unmistakable "this is not a real paired unit" visual on real
@@ -217,7 +216,6 @@ void prod_app_tick(void) {
         if (!g_ramping_to_idle) {
             step_toward_target(g_target_throttle);
         }
-        battery_tick();
     }
 
     prod_actuation_tick(now);

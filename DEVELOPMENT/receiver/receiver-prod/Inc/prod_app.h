@@ -15,14 +15,14 @@
  *                            backstop), persists until the next STARTING
  *                            or KILLED transition. Same rule as the bench
  *                            rig's separate green LED used to be.
- *   4. Default (armed,    - red, LUB-DUB heartbeat (HEARTBEAT_PATTERN),
- *      never yet started)   faster if the receiver's own battery is low
- *                            (g_batt_low scales the pattern - see
- *                            prod_status_led_tick()). This is what shows
- *                            right after boot/re-arm, before any crank has
- *                            ever completed - not green.
- * Kill and battery-low both wanting the red channel is intentional: kill is
- * the higher-priority signal, so battery status isn't shown while killed.
+ *   4. Default (armed,    - red, LUB-DUB heartbeat (HEARTBEAT_PATTERN).
+ *      never yet started)   This is what shows right after boot/re-arm,
+ *                            before any crank has ever completed - not
+ *                            green.
+ * There is deliberately no battery indication anywhere on this board - no
+ * battery sense pin, no LED behavior tied to pack voltage. Standalone
+ * battery meters on the packs themselves cover that instead (see
+ * docs/OPEN-ITEMS.md).
  *
  * Cruise indicator (separate, dedicated LED, physically relocated off the
  * old tri-color package's blue lead onto its own standalone LED on the

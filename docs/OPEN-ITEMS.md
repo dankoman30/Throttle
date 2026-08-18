@@ -319,10 +319,14 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
   - **Decision deferred; actual battery choice may still change.** Don't
     finalize the battery-compartment mechanical design or order production
     cells until this is resolved.
-- [ ] **Receiver battery chemistry/voltage** — pick the receiver pack, then
-  replace the placeholder mV values in `RX_BATT` and `read_battery_mv()`'s
-  divider scaling with measured values. (Handle-side battery monitoring was
-  dropped entirely 2026-08-08 - see below - so this is receiver-only now.)
+- [x] ~~Receiver battery chemistry/voltage~~ — **moot, 2026-08-17: all
+  battery sensing removed project-wide** (see below). There is no longer a
+  `RX_BATT` profile or `read_battery_mv()` to calibrate against a chosen
+  pack - standalone battery meters on the packs are the only battery
+  indication either board has now. Picking the receiver pack chemistry/
+  voltage is still a real open question for power architecture (see
+  "Servo power architecture" above), just no longer tied to any firmware
+  calibration step.
 - [ ] **Engine interface — isolation strategy (decision).** Recommend driving
   kill + starter through **relays or opto-isolated SSRs**, not bare MOSFETs, so
   receiver-ground stays isolated from the noisy engine-ground / starter domain.
@@ -339,14 +343,19 @@ Legend: `[ ]` open · `[x]` done · `[~]` in progress / partially done.
 - [ ] **Connectors** — locking, vibration-rated (JST-SM minimum;
   Deutsch/Amphenol preferred).
 - [x] ~~Battery readout wiring — 3/4-LED bar + piezo buzzer per side~~ —
-  **superseded 2026-08-08**: the handle has no onboard battery sense at all
-  now (standalone battery meters on the packs themselves, not wired to the
-  board); the receiver folds low-battery into its tri-color status LED's
-  blink rate instead of a dedicated bar/buzzer (see `prod_app.c`). The
-  bar/buzzer math in `battery_monitor.h` (`battery_eval`/`battery_buzzer_on`)
-  stays as general-purpose, unit-tested logic but isn't wired to real
-  hardware on either board. The "standalone battery meters" referenced here
-  are now on hand - see the next item.
+  **superseded 2026-08-08, then removed entirely 2026-08-17.** The handle
+  never had onboard battery sense (standalone battery meters on the packs
+  themselves instead); the receiver briefly folded low-battery into its
+  status LED's blink rate (`g_batt_low` scaling the heartbeat), but that
+  read a real ADC pin (`BATT_SENSE`/`PA6`) that was never actually wired to
+  a pack, so on the bench it just read the floating pin as "low" and ran
+  the heartbeat at 2x speed - a confusing artifact, not a real feature.
+  **Decision (2026-08-17): no battery indication of any kind on either
+  board, ever** - not a bar, not a buzzer, not an LED blink-rate tell.
+  `src/common/battery_monitor.h` and all `g_batt_low`/`read_battery_mv()`/
+  `RX_BATT` code are deleted, not just unwired. Standalone battery meters
+  on the packs (see the next item) are the only battery indication either
+  unit has now, by design.
 - [ ] **Battery capacity indicator modules ordered (2026-08-09).** Two
   kinds, one for each pack, both purely passive - 2-wire, connected straight
   across the battery terminals, no GPIO/ADC pins on either board and no

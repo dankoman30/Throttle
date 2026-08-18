@@ -115,20 +115,6 @@ it in the air.
 | `CRANK_LOSS_ABORT_MS` | 175 | Stop cranking if no valid packet arrives for this long | Deliberately faster than the general watchdog thresholds above, since cranking blind on a dead link is worse than just holding throttle. Too low risks aborting a normal crank on a brief hiccup. |
 | `STARTER_COOLDOWN_MS` | 3000 | After a *forced* crank stop (backstop or loss-abort — not a normal voluntary release) refuse a new crank this long | Higher gives more starter-motor protection between forced stops; lower allows a quicker retry once the fault clears. Never applies after a normal release. |
 
-### Battery monitor (`battery_monitor.h`, shared by both ends)
-
-| Constant | Default | Controls |
-|---|---|---|
-| `BATTERY_POLL_MS` | 500 | How often the pack voltage is re-read and the LED bar refreshed |
-| `BATTERY_BUZZ_ON_MS` | 120 | Buzzer on-time within each low-battery beep |
-| `BATTERY_BUZZ_PERIOD_MS` | 2000 | Time between low-battery beeps |
-
-Not a `#define`, but worth knowing about: the actual pack voltage curve
-(`full_mv`/`empty_mv`/`low_mv`/`led_count`) is set per unit — `HANDLE_BATT`
-in `handle_firmware.c` and `RX_BATT` in `receiver_firmware.c`. Both are
-currently placeholder values and **must be measured against your real packs**
-before the LED bar or low-battery buzzer mean anything.
-
 ### Not tuning knobs
 
 `PACKET_SYNC_BYTE`, the `CMD_FLAG_*` bit assignments, `PACKET_SIZE`, and
