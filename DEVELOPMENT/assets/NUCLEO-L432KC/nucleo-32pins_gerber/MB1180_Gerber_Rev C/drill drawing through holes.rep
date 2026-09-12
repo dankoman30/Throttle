@@ -1,0 +1,21 @@
+---------------------------------------------------------------------------
+NCDrill File Report For: MB1180.PcbDoc   2015/6/5  10:20:53
+---------------------------------------------------------------------------
+
+Layer Pair : Top Layer to Bottom Layer
+ASCII RoundHoles File : MB1180-RoundHoles.TXT
+ASCII SlotHoles File : MB1180-SlotHoles.TXT
+EIA File   : MB1180.DRL
+
+Tool         Hole Size           Hole Type     Hole Count Plated       Tool Travel
+---------------------------------------------------------------------------
+T1        8mil (0.2032mm)          Round          146              15.01 Inch (381.33 mm)
+T2        12mil (0.3048mm)         Round          16               2.69 Inch (68.35 mm)
+T3        24mil (0.6096mm)         Slot           2                284.64 Inch (7229.80 mm)
+T4        33mil (0.8382mm)         Round          2                0.20 Inch (5.00 mm)
+T5        35mil (0.889mm)          Round          5                0.44 Inch (11.21 mm)
+T6        40mil (1.016mm)          Round          30               3.90 Inch (99.06 mm)
+---------------------------------------------------------------------------
+Totals                                            201              306.88 Inch (7794.76 mm)
+
+Total Processing Time (hh:mm:ss) : 00:00:00

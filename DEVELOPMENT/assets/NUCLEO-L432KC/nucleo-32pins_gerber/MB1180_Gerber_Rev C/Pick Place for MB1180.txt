@@ -1,0 +1,94 @@
+Designator Footprint               Mid X         Mid Y         Ref X         Ref Y         Pad X         Pad Y TB      Rotation Comment        
+
+SB3        SB_0603                281mil       1048mil        281mil       1048mil        281mil    1014.25mil  T        270.00 Circuit Breaker (close)
+D3         SMA                    246mil        220mil        246mil        220mil        166mil        220mil  B        360.00 STPS2L30A      
+SB17       SB_0603                204mil        572mil        204mil        572mil        204mil     605.75mil  B         90.00 Circuit Breaker (open)
+CN2        HDR_1x5_2R54_V_M        634mil       1836mil        684mil       1736mil        684mil       1736mil  T         90.00 [N/A]          
+SB15       SB_0603                419mil        113mil        419mil        113mil     385.25mil        113mil  B        180.00 Circuit Breaker (close)
+SB4        SB_0603                155mil        457mil        155mil        457mil        155mil     423.25mil  T        270.00 Circuit Breaker (open)
+SB14       SB_0603                555mil        330mil        555mil        330mil     521.25mil        330mil  B        180.00 Circuit Breaker (close)
+SB9        SB_0603                169mil       1570mil        169mil       1570mil        169mil    1536.25mil  B        270.00 Circuit Breaker (close)
+R9         0603R                  213mil       1311mil        213mil       1311mil        213mil   1279.504mil  T         90.00 100K           
+B1         SW2_5R6_5R5x3R1        368mil         80mil        368mil         80mil    257.764mil         80mil  T        360.00 KSS221G        
+C2         0603C                  154mil       1456mil        154mil       1456mil        154mil   1487.496mil  T        270.00 100nF          
+Designator QFN50P530X530X160-32N        365mil        735mil        365mil        735mil    296.102mil     642.48mil  T         90.00 Comment        
+U2         LQFP32_0R5_7x7         365mil        735mil        365mil        735mil    254.764mil    567.677mil  T        360.00 MCU_LQFP32/QFN32
+CN4        HDR_1x15_2R54_V_F        665mil        930mil        665mil       1630mil        665mil       1630mil  B        270.00 Header 15X1_male
+CN3        HDR_1x15_2R54_V_F         65mil        930mil         65mil       1630mil         65mil       1630mil  B        270.00 Header 15X1_male
+C18        0603C                  169mil       1721mil        169mil       1721mil        169mil   1689.504mil  B         90.00 1uF_X5R_0603   
+C21        0603C                  493mil       1048mil        493mil       1048mil        493mil   1079.496mil  B        270.00 10pF           
+C5         0603C                  576mil       1188mil        576mil       1188mil        576mil   1219.496mil  T        270.00 100nF          
+C15        0603C                  228mil       1721mil        228mil       1721mil        228mil   1689.504mil  B         90.00 100nF          
+C4         0603C                  154mil       1311mil        154mil       1311mil        154mil   1342.496mil  T        270.00 100nF          
+C20        0603C                  277mil       1048mil        277mil       1048mil        277mil   1079.496mil  B        270.00 10pF           
+C17        0603C                  365mil       1810mil        365mil       1810mil    333.504mil       1810mil  B        360.00 10nF_X7R_0603  
+C3         0603C                  213mil       1456mil        213mil       1456mil        213mil   1424.504mil  T         90.00 20pF[N/A]      
+C11        0603C                  153mil        316mil        153mil        316mil        153mil    347.496mil  T        270.00 100nF          
+C9         0603C                  509mil     453.75mil        509mil     453.75mil        509mil    422.254mil  T         90.00 1uF_X5R_0603   
+C10        0603C                  568mil     453.75mil        568mil     453.75mil        568mil    485.246mil  T        270.00 100nF          
+C8         0603C                  449mil     453.75mil        449mil     453.75mil        449mil    485.246mil  T        270.00 100nF          
+C14        0603C                  449mil        316mil        449mil        316mil        449mil    347.496mil  T        270.00 1uF_X5R_0603   
+C23        0603C                  204mil        727mil        204mil        727mil        204mil    695.504mil  B         90.00 100nF          
+C7         0603C                  576mil       1048mil        576mil       1048mil        576mil   1016.504mil  T         90.00 100nF          
+C24        0603C                  261mil        454mil        261mil        454mil        261mil    422.504mil  B         90.00 100nF          
+C12        0603C                  242mil        282mil        242mil        282mil    273.496mil        282mil  T        180.00 4.3pF          
+C13        0603C                  360mil        282mil        360mil        282mil    328.504mil        282mil  T        360.00 4.3pF          
+C6         0603C                  340mil       1048mil        340mil       1048mil        340mil   1016.504mil  T         90.00 4.7uF          
+C1         0603C                  390mil       1456mil        390mil       1456mil        390mil   1487.496mil  T        270.00 100nF          
+D1         SOD-323                218mil       1740mil        218mil       1740mil    265.244mil       1740mil  T        180.00 BAT60JFILM     
+D2         SOD-323                218mil       1668mil        218mil       1668mil    265.244mil       1668mil  T        180.00 BAT60JFILM     
+D4         SOD-323                207mil        124mil        207mil        124mil    159.756mil        124mil  B        360.00 BAT60JFILM     
+L1         0603L                  199mil        450mil        199mil        450mil        199mil      422.5mil  B        270.00 BEAD           
+LD1        HSMF-A201               75mil       1845mil         75mil       1845mil    104.528mil   1904.055mil  T        270.00 LD_BICOLOR_CMS 
+LD3        0603D_G                564mil         93mil        564mil         93mil        564mil    126.465mil  T         90.00 Green          
+LD2        0603D_R                172mil         93mil        172mil         93mil        172mil    126.465mil  T         90.00 RED            
+R13        0603R                  517mil       1188mil        517mil       1188mil        517mil   1156.504mil  T         90.00 10K[N/A]       
+R16        0603R                  517mil       1048mil        517mil       1048mil        517mil   1016.504mil  T         90.00 10K            
+R10        0603R                  576mil       1311mil        576mil       1311mil        576mil   1342.496mil  T        270.00 4K7            
+R6         0603R                  331mil       1456mil        331mil       1456mil        331mil   1487.496mil  T        270.00 100K           
+R11        0603R                  517mil       1311mil        517mil       1311mil        517mil   1279.504mil  T         90.00 2K7            
+R3         0603R                  576mil       1592mil        576mil       1592mil        576mil   1623.496mil  T        270.00 36K            
+R8         0603R                  576mil       1456mil        576mil       1456mil        576mil   1487.496mil  T        270.00 100            
+R4         0603R                  517mil       1592mil        517mil       1592mil        517mil   1560.504mil  T         90.00 10K            
+R2         0603R                  511mil       1717mil        511mil       1717mil        511mil   1748.496mil  T        270.00 100K           
+R1         0603R                  460mil       1717mil        460mil       1717mil        460mil   1748.496mil  T        270.00 1K5            
+R17        0603R                   68mil       1908mil         68mil       1908mil     36.504mil       1908mil  B        360.00 0              
+R19        0603R                   68mil       1790mil         68mil       1790mil     36.504mil       1790mil  B        360.00 100            
+R18        0603R                   68mil       1849mil         68mil       1849mil     36.504mil       1849mil  B        360.00 100            
+R14        0603R                  154mil       1048mil        154mil       1048mil        154mil   1016.504mil  T         90.00 4K7            
+R20        0603R                  228mil       1570mil        228mil       1570mil        228mil   1538.504mil  B         90.00 100            
+R5         0603R                  272mil       1456mil        272mil       1456mil        272mil   1487.496mil  T        270.00 100            
+R12        0603R                  213mil       1048mil        213mil       1048mil        213mil   1016.504mil  T         90.00 4K7            
+R23        0603R                  420mil         54mil        420mil         54mil    451.496mil         54mil  B        180.00 510            
+R22        0603R                  223mil         54mil        223mil         54mil    191.504mil         54mil  B        360.00 1K             
+R21        0603R                  430mil        815mil        430mil        815mil    398.504mil        815mil  B        360.00 10K            
+R15        0603R                  458mil       1048mil        458mil       1048mil        458mil   1016.504mil  T         90.00 10K            
+R7         0603R                  449mil       1456mil        449mil       1456mil        449mil   1424.504mil  T         90.00 2.7K           
+SB1        SB_0603                517mil       1456mil        517mil       1456mil        517mil    1489.75mil  T         90.00 Circuit Breaker (open)
+SB2        SB_0603                213mil       1188mil        213mil       1188mil        213mil    1154.25mil  T        270.00 Circuit Breaker (close)
+SB8        SB_0603                390mil     453.75mil        390mil     453.75mil        390mil        420mil  T        270.00 Circuit Breaker
+SB13       SB_0603                272mil        727mil        272mil        727mil        272mil     693.25mil  B        270.00 Circuit Breaker (close)
+SB7        SB_0603                331mil     453.75mil        331mil     453.75mil        331mil        420mil  T        270.00 Circuit Breaker
+SB5        SB_0603                272mil     453.75mil        272mil     453.75mil        272mil        420mil  T        270.00 Circuit Breaker
+SB6        SB_0603                213mil     453.75mil        213mil     453.75mil        213mil        420mil  T        270.00 Circuit Breaker
+SB10       SB_0603                272mil        572mil        272mil        572mil        272mil     538.25mil  B        270.00 Circuit Breaker (close)
+SB11       SB_0603                548mil        815mil        548mil        815mil     514.25mil        815mil  B        180.00 Circuit Breaker (close)
+U4         SOT23-5L               364mil       1908mil        364mil       1908mil     310.85mil   1870.598mil  B        360.00 LD3985M33R     
+U5         LQFP48_0R5_7x7         365mil       1324mil        365mil       1324mil    473.268mil   1156.677mil  B        180.00 STM32F103CBT6  
+U3         DFN6_0R95_3x3_TP        539mil        322mil        539mil        322mil    501.598mil    270.818mil  T        360.00 LD39050PU33R   
+U1         SO-8                   365mil       1252mil        365mil       1252mil        290mil   1156.528mil  T         90.00 ST890CDR       
+X1         XTAL_2SM_3R2X1R5        302mil        354mil        302mil        354mil    252.787mil        354mil  T        360.00 NX3215SA-32.768K-EXS00A-MU00525
+C22        TAN_B                  464mil        703mil        464mil        703mil    525.024mil        703mil  B        360.00 10uF(25V)      
+C25        TAN_A                  218mil        332mil        218mil        332mil        273mil        332mil  B        360.00 10uF           
+SB12       SB_0603                312mil        815mil        312mil        815mil     278.25mil        815mil  B        180.00 Circuit Breaker (close)
+C19        0603C                  459mil       1721mil        459mil       1721mil        459mil   1689.504mil  B         90.00 100nF          
+C16        0603C                  518mil       1721mil        518mil       1721mil        518mil   1752.496mil  B        270.00 1uF_X5R_0603   
+T1         SOT23-3                424mil       1596mil        424mil       1596mil     463.37mil   1634.583mil  T         90.00 9013           
+U6         SOT-223                430mil        448mil        430mil        448mil        337mil        573mil  B        270.00 LD1117S50TR    
+CN1        Molex_1050170001        365mil    1869.15mil        365mil       1816mil    416.181mil       1816mil  T        180.00 1050170001     
+Designator ST_LOGO_5mm      -2943.268mil   -1323.15mil        216mil       1565mil  -2943.268mil   -1323.15mil  T          0.00 Comment        
+X2         XTAL_2SM_3R2x2R5    384.402mil       1052mil        347mil       1052mil        347mil       1052mil  B        360.00 NX3225GD 8MHz EXS00A-CG04874
+JP1        HDR_1x2_1R27_R_M    546.933mil        258mil    547.031mil        209mil    572.031mil        258mil  B        180.00 PH127H10102JNG-2/3/1.5
+SB16       SB_0603                571mil        908mil        571mil        908mil        571mil     941.75mil  B         90.00 Circuit Breaker (open)
+SB18       SB_0603             571.25mil       1048mil     571.25mil       1048mil     571.25mil    1081.75mil  B         90.00 Circuit Breaker (open)
+
